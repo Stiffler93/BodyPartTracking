@@ -1,0 +1,65 @@
+string featStr = "\\features\\";
+
+	imwrite(TRAINING_DATA_PATH + featStr + "subject.png", subject);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat1.png", feat1);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat2.png", feat2);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat3.png", feat3);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat4.png", feat4);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat5.png", feat5);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat6.png", feat6);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat7.png", feat7);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat8.png", feat8);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat9.png", feat9);
+	imwrite(TRAINING_DATA_PATH + featStr + "feat10.png", feat10);
+	cv::convertScaleAbs(feat1, feat1, 255 / 50);
+	cv::convertScaleAbs(feat2, feat2, 255 / 50);
+	cv::convertScaleAbs(feat3, feat3, 255 / 50);
+	cv::convertScaleAbs(feat4, feat4, 255 / 50);
+	cv::convertScaleAbs(feat5, feat5, 255 / 50);
+	cv::convertScaleAbs(feat6, feat6, 255 / 50);
+	cv::convertScaleAbs(feat7, feat7, 255 / 50);
+	cv::convertScaleAbs(feat8, feat8, 255 / 50);
+	cv::convertScaleAbs(feat9, feat9, 255 / 50);
+	cv::convertScaleAbs(feat10, feat10, 255 / 50);
+
+	//printf("Col Image Type: %d\n", colImg.type());
+	//printf("Dep Image Type: %d\n", depImg.type());
+	//printf("Subject Image Type: %d\n", subject.type());
+
+
+
+	
+	
+	int key = -1;
+	while (key != 27) {
+		//show(colImg, depImg);
+		imshow("Depth Image", depImg);
+		imshow("Subject", subject);
+		imshow("Feature 1", feat1);
+		imshow("Feature 2", feat2);
+		imshow("Feature 3", feat3);
+		imshow("Feature 4", feat4);
+		imshow("Feature 5", feat5);
+		imshow("Feature 6", feat6);
+		imshow("Feature 7", feat7);
+		imshow("Feature 8", feat8);
+		imshow("Feature 9", feat9);
+		imshow("Feature 10", feat10);
+		key = waitKey(10);
+	}
+
+
+
+		namedWindow("Color Image");
+	namedWindow("Depth Image");
+	namedWindow("Subject");
+	namedWindow("Feature 1");
+	namedWindow("Feature 2");
+	namedWindow("Feature 3");
+	namedWindow("Feature 4");
+	namedWindow("Feature 5");
+	namedWindow("Feature 6");
+	namedWindow("Feature 7");
+	namedWindow("Feature 8");
+	namedWindow("Feature 9");
+	namedWindow("Feature 10");

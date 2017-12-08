@@ -1,0 +1,12 @@
+*.sln
+*.VC.db
+*.VC.VC.opendb
+Data
+.vs
+x64
+Debug
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
+*.aps
+*.rc
