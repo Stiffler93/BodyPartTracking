@@ -13,7 +13,6 @@
 using namespace std;
 
 
-
 namespace tree {
 
 typedef struct Dataset {
@@ -22,7 +21,7 @@ typedef struct Dataset {
 	string toString() {
 		stringstream ss;
 		for (int i = 0; i < numFeatures(); i++)
-			ss << feature[i] << ",";
+			ss << feature[i] << " ";
 		ss << outcome;
 		return ss.str();
 	};
@@ -84,8 +83,12 @@ public:
 	DecisionNode(Decision decision) : Node(DECISION), dec(decision) { }
 	Decision dec;
 	string toString() {
-		int trueBranchNum = true_branch->getNum();
-		int falseBranchNum = false_branch->getNum();
+		int trueBranchNum = 0;
+		if(true_branch != NULL)
+			trueBranchNum = true_branch->getNum();
+		int falseBranchNum = 0;
+		if(false_branch != NULL)
+			falseBranchNum = false_branch->getNum();
 		return "D(" + to_string(numNode) + "," + to_string(dec.refVal) + "," + to_string(dec.feature) + "," + to_string(trueBranchNum) + "," + to_string(falseBranchNum) + ")";
 	}
 };

@@ -1,11 +1,12 @@
 #include <string>
-#include <iostream>
+//#include <iostream>
 #include <vector>
 #include <windows.h>
 #include <strsafe.h>
 #include "opencv2\opencv.hpp"
 #include "Features.hpp"
 #include "DecTree.h"
+#include "TreeConstants.h"
 
 using namespace std;
 using namespace cv;
@@ -36,125 +37,91 @@ int main(int argc, char** argv)
 		return 2;
 	}
 
-	namedWindow("ColImage");
-	namedWindow("Reference");
-
-	string colStr = classifiedImagesFolder() + trData[0];
-	Mat colImg = imread(colStr);
-
-	string depStr = depthImagesFolder() + trData[0];
-	Mat depImg = imread(depStr, CV_LOAD_IMAGE_ANYDEPTH);
-
-	Mat subject = Mat(depImg.rows, depImg.cols, depImg.type());
-	Mat mask;
-
-	getSubject(depImg, subject);
-
 	Mat feat1, feat2, feat3, feat4, feat5, feat6, feat7, feat8, feat9, feat10;
-	feat1.create(depImg.rows, depImg.cols, depImg.type());
-	feat2.create(depImg.rows, depImg.cols, depImg.type());
-	feat3.create(depImg.rows, depImg.cols, depImg.type());
-	feat4.create(depImg.rows, depImg.cols, depImg.type());
-	feat5.create(depImg.rows, depImg.cols, depImg.type());
-	feat6.create(depImg.rows, depImg.cols, depImg.type());
-	feat7.create(depImg.rows, depImg.cols, depImg.type());
-	feat8.create(depImg.rows, depImg.cols, depImg.type());
-	feat9.create(depImg.rows, depImg.cols, depImg.type());
-	feat10.create(depImg.rows, depImg.cols, depImg.type());
-	
-	feature1(subject, feat1, 30);
-	feature2(subject, feat2, 20);
-	feature3(subject, feat3, 20);
-	feature4(subject, feat4, 20);
-	feature5(subject, feat5, 40);
-	feature6(subject, feat6, 60);
-	feature7(subject, feat7, 30);
-	feature8(subject, feat8, 30);
-	feature9(subject, feat9, 50);
-	feature10(subject, feat10, 50);
+	feat1.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat2.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat3.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat4.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat5.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat6.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat7.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat8.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat9.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat10.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 
-	printf("Classify pixels:\n");
-	size_t classified = 0;
-
-	Mat reference;
-	reference.create(240, 320, CV_8UC3);
-	reference = 0;
-	vector<Dataset> datasets;
-
-	for (int row = 0; row < MAX_ROW; row++) {
-		for (int col = 0; col < MAX_COL; col++) {
-			if (subject.at<ushort>(row, col) == 0)
-				continue;
-
-			Vec3b colors = colImg.at<Vec3b>(row, col);
-			Dataset set;
-			set.outcome = getCategory(colors[2], colors[1], colors[0]);
-			
-			if (set.outcome == NONE)
-				continue;
-
-			Vec3b color;
-			if (set.outcome == LEFT_SHOULDER) {
-				color = Vec3b(0, 0, 255);
-			}
-			else if (set.outcome == RIGHT_SHOULDER) {
-				color = Vec3b(0, 255, 0);
-			}
-			else if (set.outcome == NECK) {
-				color = Vec3b(255, 255, 0);
-			}
-			else if (set.outcome == HEAD) {
-				color = Vec3b(255, 0, 0);
-			}
-			else if (set.outcome == STERNUM) {
-				color = Vec3b(100, 100, 100);
-			}
-			else if (set.outcome == OTHER) {
-				color = Vec3b(255, 255, 255);
-			}
-
-			reference.at<Vec3b>(row, col) = color;
-
-			set.feature[0] = feat1.at<ushort>(row, col);
-			set.feature[1] = feat2.at<ushort>(row, col);
-			set.feature[2] = feat3.at<ushort>(row, col);
-			set.feature[3] = feat4.at<ushort>(row, col);
-			set.feature[4] = feat5.at<ushort>(row, col);
-			set.feature[5] = feat6.at<ushort>(row, col);
-			set.feature[6] = feat7.at<ushort>(row, col);
-			set.feature[7] = feat8.at<ushort>(row, col);
-			set.feature[8] = feat9.at<ushort>(row, col);
-			set.feature[9] = feat10.at<ushort>(row, col);
-
-			datasets.push_back(set);
-			if (++classified % 100 == 0)
-				printf("Already classified %zd pixels.\n", classified);
-		}
-	}
-
-	size_t size = datasets.size();
-	printf("Algorithm classified %zd pixels.\n", size);
-
-	size_t written = 0;
 	ofstream features(datasetFile());
-	for (Dataset set : datasets) {
-		features << set.toString() << endl;
-		if(++written % 100 == 0)
-			printf("Wrote %zd of %zd pixels.\n", written, size);
+
+	for (string image : trData) {
+
+		printf("Handle image %s\n", image.c_str());
+
+		string colStr = classifiedImagesFolder() + image;
+		Mat colImg = imread(colStr);
+
+		string depStr = depthImagesFolder() + image;
+		Mat depImg = imread(depStr, CV_LOAD_IMAGE_ANYDEPTH);
+
+		Mat subject = Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+
+		getSubject(depImg, subject);
+
+		feature1(subject, feat1, 30);
+		feature2(subject, feat2, 20);
+		feature3(subject, feat3, 20);
+		feature4(subject, feat4, 20);
+		feature5(subject, feat5, 40);
+		feature6(subject, feat6, 60);
+		feature7(subject, feat7, 30);
+		feature8(subject, feat8, 30);
+		feature9(subject, feat9, 50);
+		feature10(subject, feat10, 50);
+
+		vector<Dataset> datasets;
+		Dataset set;
+		Vec3b colors;
+
+		for (int row = 0; row < MAX_ROW; row++) {
+			for (int col = 0; col < MAX_COL; col++) {
+				if (subject.at<ushort>(row, col) == 0)
+					continue;
+
+				colors = colImg.at<Vec3b>(row, col);
+				set.outcome = getCategory(colors[2], colors[1], colors[0]);
+
+				if (set.outcome == NONE)
+					continue;
+
+				set.feature[0] = feat1.at<ushort>(row, col);
+				set.feature[1] = feat2.at<ushort>(row, col);
+				set.feature[2] = feat3.at<ushort>(row, col);
+				set.feature[3] = feat4.at<ushort>(row, col);
+				set.feature[4] = feat5.at<ushort>(row, col);
+				set.feature[5] = feat6.at<ushort>(row, col);
+				set.feature[6] = feat7.at<ushort>(row, col);
+				set.feature[7] = feat8.at<ushort>(row, col);
+				set.feature[8] = feat9.at<ushort>(row, col);
+				set.feature[9] = feat10.at<ushort>(row, col);
+
+				datasets.push_back(set);
+			}
+		}
+
+		size_t size = datasets.size();
+		printf("Algorithm classified %zd pixels for Image %s.\n", size, image.c_str());
+
+		size_t written = 0;
+		for (Dataset set : datasets) {
+			features << set.toString() << endl;
+		}
+
+		printf("\nFinished image %s.\n", image.c_str());
 	}
 
-	int key = -1;
-	while (key != 27) {
-		imshow("ColImage", colImg);
-		imshow("Reference", reference);
-		key = waitKey(10);
-	}
-		
 	features.close();
 
-	printf("Wrote ALL pixels successfully.\n");
-
+	printf("Classified all images successfully.\n");
 	printf("Program finished Successfully.\n");
+
 	pause();
 	return 0;
 }

@@ -1,5 +1,7 @@
 #include "DecTree.h"
 #include "TreeSettings.h"
+#include "TreeUtils.h"
+#include <ctime>
 
 using namespace tree;
 
@@ -12,7 +14,6 @@ bool checkTreeFile(string outputfile);
 bool checkTrainingInput(string inputfile);
 void readTrainingData(string inputfile, Dataset* trData, int* numTrData);
 void startTraining(Dataset* trData, int numTrData, Node*& rootNode);
-void printTree(Node* node);
 void saveTree(Node* tree, ofstream& file);
 
 void test(Dataset test, Node* decisionTree);
@@ -46,17 +47,31 @@ int main(int argc, char** argv)
 	}
 	printf("Successfully parsed %d rows of data.\n", numTrData);
 
+	printf("Start Training? (y/n)\n");
+	string a; 
+	cin >> a;
+
+	if (a != "y" && a != "Y")
+		return 0;
+
+	clock_t begin = clock();
+
 	Node* decisionTree = NULL;
 	startTraining(trData, numTrData, decisionTree);
+
+	clock_t end = clock();
+	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+
+	printf("Training took %lf seconds!\n", elapsed_secs);
 
 	trace("Write training results to " + treeFile());
 	printTree(decisionTree);
 
 	ofstream tree_file(treeFile());
 	saveTree(decisionTree, tree_file);
+	tree_file.close();
 
 	traceFile.close();
-	tree_file.close();
 
 	//trData must not be deleted, because is already during Training
 
@@ -327,6 +342,8 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData) {
 	
 	delete[] trData;
 
+	printf("Node found.\n");
+
 	if(part.true_branch_size > 0)
 		buildTree(decNode->true_branch, part.true_branch, part.true_branch_size);
 	
@@ -338,15 +355,6 @@ void startTraining(Dataset* trData, int numTrData, Node*& rootNode)
 {
 	trace("startTraining()");
 	buildTree(rootNode, trData, numTrData);
-}
-
-void printTree(Node * node)
-{
-	trace(node->toString());
-	if (node->true_branch != NULL)
-		printTree(node->true_branch);
-	if (node->false_branch != NULL)
-		printTree(node->false_branch);
 }
 
 void saveTree(Node * tree, ofstream& file)
@@ -365,7 +373,7 @@ void test(Dataset test, Node * decisionTree)
 {
 	trace("Test for " + test.outcome + " with values: >" + to_string(test.feature[0]) + "," + to_string(test.feature[1]) + "," + to_string(test.feature[2]) + "<");
 
-	Node* node = decisionTree;
+	/*Node* node = decisionTree;
 	while (!node->isResult()) {
 		if (((DecisionNode*)node)->dec.decide(test)) {
 			node = node->true_branch;
@@ -373,9 +381,10 @@ void test(Dataset test, Node * decisionTree)
 		else {
 			node = node->false_branch;
 		}
-	}
+	}*/
 
-	vector<Result> results = ((ResultNode*)node)->result;
+	vector<Result> results;
+	findResult(decisionTree, test, results);
 
 	if (results.size() == 1) {
 		trace("Result is " + results[0].outcome);

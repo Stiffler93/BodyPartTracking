@@ -1,20 +1,8 @@
 #include "opencv2\opencv.hpp"
+#include "TreeConstants.h"
 
 using namespace cv;
 using namespace std;
-
-const static ushort MAX_VAL = 65535;
-const static int MAX_ROW = 240;
-const static int MAX_COL = 320;
-const static int MIN_DIST = 5000;
-
-const static string LEFT_SHOULDER = "LeftShoulder";
-const static string RIGHT_SHOULDER = "RightShoulder";
-const static string HEAD = "Head";
-const static string NECK = "Neck";
-const static string STERNUM = "Sternum";
-const static string OTHER = "Other";
-const static string NONE = "None";
 
 //This function returns an image where the subject is extracted
 //from the original depth image
