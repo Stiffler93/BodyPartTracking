@@ -12,7 +12,6 @@
 
 using namespace std;
 
-
 namespace tree {
 
 typedef struct Dataset {
@@ -42,13 +41,12 @@ typedef struct Partition {
 	int true_branch_size = 0, false_branch_size = 0;
 } Partition;
 
+#pragma once
 class Decision {
 public:
-	Decision() : Decision(0, 0) {};
-	Decision(int ref, int feat) : refVal(ref), feature(feat) {};
-	bool decide(Dataset trData) {
-		return trData.feature[feature] >= refVal;
-	}
+	Decision();
+	Decision(int ref, int feat);
+	bool decide(Dataset trData);
 	int refVal, feature;
 };
 
@@ -63,9 +61,10 @@ enum NodeType {
 	RESULT = 1
 };
 
+#pragma once
 class Node {
 public:
-	Node(NodeType type) : type(type) { numNode = ++numOfNodes; };
+	Node(NodeType type);
 	bool isResult() { return type == RESULT; }
 	Node* false_branch, *true_branch;
 	virtual string toString() = 0;
@@ -76,43 +75,20 @@ protected:
 	int numNode;
 };
 
-int tree::Node::numOfNodes = 0;
-
+#pragma once
 class DecisionNode : tree::Node {
 public:
-	DecisionNode(Decision decision) : Node(DECISION), dec(decision) { }
+	DecisionNode(Decision decision);
 	Decision dec;
-	string toString() {
-		int trueBranchNum = 0;
-		if(true_branch != NULL)
-			trueBranchNum = true_branch->getNum();
-		int falseBranchNum = 0;
-		if(false_branch != NULL)
-			falseBranchNum = false_branch->getNum();
-		return "D(" + to_string(numNode) + "," + to_string(dec.refVal) + "," + to_string(dec.feature) + "," + to_string(trueBranchNum) + "," + to_string(falseBranchNum) + ")";
-	}
+	string toString();
 };
 
+#pragma once
 class ResultNode : tree::Node {
 public:
-	ResultNode(Result result) : Node(RESULT) {
-		this->result.push_back(result);
-		numResults = 1;
-	}
-	ResultNode(vector<Result> result) : Node(RESULT) {
-		this->result = result;
-		numResults = (int)result.size();
-	}
-	string toString() {
-		stringstream ss;
-		ss << "R(" << to_string(numNode);
-		for (Result r : result) {
-			ss << ",C(" << r.outcome << "," << to_string(r.probability) << ")";
-		}
-		ss << ")";
-
-		return ss.str();
-	}
+	ResultNode(Result result);
+	ResultNode(vector<Result> result);
+	string toString();
 	vector<Result> result;
 	int numResults;
 };

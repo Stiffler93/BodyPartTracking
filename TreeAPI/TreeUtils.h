@@ -2,36 +2,19 @@
 #define TREE_UTILS
 
 #include "DecTree.h"
+#include "TreeSettings.h"
 #include <vector>
 
-using namespace tree;
+void printTree(tree::Node * node);
 
-void printTree(Node * node)
-{
-	printf("%s\n", node->toString().c_str());
-	if (node->true_branch != NULL)
-		printTree(node->true_branch);
-	if (node->false_branch != NULL)
-		printTree(node->false_branch);
-}
+void saveTree(tree::Node * tree, ofstream& file);
 
-void findResult(Node* node, Dataset test, std::vector<Result>& results) {
-	while (!node->isResult()) {
-		if (((DecisionNode*)node)->dec.decide(test)) {
-			node = node->true_branch;
-		}
-		else {
-			node = node->false_branch;
-		}
-	}
+void freeTree(tree::Node * node);
 
-	if (node->isResult()) {
-		results = ((ResultNode*)node)->result;
-	}
-	else {
-		printf("Fatal Error! No Result found!!!\n");
-		throw exception("No Result found!!!\n");
-	}
-}
+void findResult(tree::Node* node, tree::Dataset test, std::vector<tree::Result>& results);
+
+void trace(string trace);
+
+void trace(const char * trc);
 
 #endif TREE_UTILS

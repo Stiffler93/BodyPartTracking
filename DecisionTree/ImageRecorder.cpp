@@ -1,36 +1,29 @@
 #include "ImageRecorder.h"
+#include "TreeConstants.h"
 
 using namespace util;
 
 //typedef cv::Point_<uint8_t> Pixel;
 
-ImageRecorder::ImageRecorder(Device & device, VideoStream ** streams/*, tree::Node* decisionTree*/)
-	:device(device), streams(streams)
-{
+ImageRecorder::ImageRecorder(Device & device, VideoStream ** streams, tree::Node* decisionTree, function<void(Mat& img, Mat& classifiedImg, tree::Dataset**& featureMatrix, tree::Node* decTree)> classification)
+	:device(device), streams(streams), decTree(decisionTree), classification(classification) {
+	featureMatrix = new tree::Dataset*[MAX_ROW];
+	for (int i = 0; i < MAX_ROW; i++)
+		featureMatrix[i] = new tree::Dataset[MAX_COL];
 }
 
-ImageRecorder::~ImageRecorder()
-{
-}
+ImageRecorder::~ImageRecorder() {}
 
-void ImageRecorder::createWindows() {
-	namedWindow(WINDOW_DEPTH, CV_WINDOW_AUTOSIZE);
-}
+void ImageRecorder::createWindows() { namedWindow(WINDOW_DEPTH, CV_WINDOW_AUTOSIZE); }
 
-void ImageRecorder::initCV()
-{
-	depthMat.create(MAT_ROWS, MAT_COLS, CV_16UC1);
-	/*colorMat.create(MAT_ROWS, MAT_COLS, CV_8UC3);
-	depthMatRecorded.create(MAT_ROWS, MAT_COLS, CV_16UC1);
-	colorMatRecorded.create(MAT_ROWS, MAT_COLS, CV_8UC3);*/
-}
+void ImageRecorder::initCV() { depthMat.create(MAX_ROW, MAX_COL, CV_16U); classifiedMat.create(MAX_ROW, MAX_COL, CV_8UC3); }
 
 void ImageRecorder::readStreams()
 {
 	int stream;
 	int key = -1;
 	while (device.isValid() && key != 27) {
-		OpenNI::waitForAnyStream(streams, 2, &stream);
+		OpenNI::waitForAnyStream(streams, 1, &stream);
 
 		switch (stream) {
 		case DEPTH_STREAM:
@@ -41,7 +34,9 @@ void ImageRecorder::readStreams()
 		}
 
 		key = waitKey(10);
-		handleKey(key);
+
+		if (key == 27)
+			break;
 	}
 }
 
@@ -57,65 +52,10 @@ void ImageRecorder::readFrame(VideoStream& stream, VideoFrameRef& frame)
 
 void ImageRecorder::processImage(Mat& img, Stream stream, const char * window)
 {
-
+	classification(img, classifiedMat, featureMatrix, decTree);
 	imshow(window, img);
+	imshow("Classified Image", classifiedMat);
 }
-
-void ImageRecorder::handleKey(int key)
-{
-	if (key != RECORD && key != FREE && key != SAVE) return;
-
-	/*switch (key) {
-	case RECORD:
-		puts("record Image");
-		depthMat.copyTo(depthMatRecorded);
-		colorMat.copyTo(colorMatRecorded);
-		break;
-	case FREE:
-		puts("free Image");
-		depthMatRecorded = Scalar(0);
-		colorMatRecorded = Scalar(0, 0, 0);
-		break;
-	case SAVE:
-		puts("save Image");
-		save();
-		break;
-	}*/
-}
-
-//void ImageRecorder::save()
-//{
-//	int length = 1;
-//	for (int n = img/10; n >= 1; n /= 10)
-//		length++;
-//
-//	stringstream s;
-//
-//	for (int i = 0; i < 3 - length; i++) {
-//		s << '0';
-//	}
-//	s << img;
-//
-//	printf("String: >%s<\n", s.str().c_str());
-//
-//	String depthImg = IMG_FOLDER + s.str() + "_depth.png";
-//	String colorImg = IMG_FOLDER + s.str() + "_color.png";
-//
-//	printf("Save Depth Img to %s\n", depthImg.c_str());
-//	printf("Save Color Img to %s\n", colorImg.c_str());
-//
-//	bool b1 = imwrite(depthImg, depthMatRecorded);
-//	bool b2 = imwrite(colorImg, colorMatRecorded);
-//
-//	if (b1) puts("Saved Depth Image");
-//	else puts("Couldn't save Depth Image");
-//
-//	if (b2) puts("Saved Color Image");
-//	else puts("Couldn't save Color Image");
-//
-//	if (b1 || b2)
-//		img++;
-//}
 
 void ImageRecorder::run()
 {
@@ -128,7 +68,7 @@ void ImageRecorder::run()
 	initCV();
 	readStreams();
 
-	destroyWindow(WINDOW_DEPTH);
+	destroyAllWindows();
 }
 
 

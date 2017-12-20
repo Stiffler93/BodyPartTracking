@@ -1,58 +1,47 @@
 #include "TreeSettings.h"
 
-const static bool BPT_TRACE = false;
-const static int BPT_NUM_FEATURES = 10;
-const static int BPT_NUM_DATASETS = 665845;
-const static string BPT_FOLDER_ROOT = "C:\\Users\\Stefan\\Desktop\\Master\\Masterarbeit\\Programme\\BodyPartTracking\\";
-const static string BPT_FOLDER_DATA = "Data\\";
-const static string BPT_FOLDER_TRAINING = "TrainingImages\\StraightPostures\\";
-const static string BPT_FOLDER_CLASSIFIED_IMAGES = "color_processed\\";
-const static string BPT_FOLDER_DEPTH_IMAGES = "depth\\";
-const static string BPT_FOLDER_FEATURES = "features\\";
-const static string BPT_FILE_TREE = "tree.txt";
-const static string BPT_FILE_DEBUG = "debug.txt";
-const static string BPT_FILE_DATASET = "dataset.txt";
+using namespace tree;
 
-bool isTraceActive() {
+bool tree::isTraceActive() {
 	return BPT_TRACE;
 }
 
-int numFeatures() {
+int tree::numFeatures() {
 	return BPT_NUM_FEATURES;
 }
 
-int numDatasets() {
+int tree::numDatasets() {
 	return BPT_NUM_DATASETS;
 }
 
-string rootFolder() {
+string tree::rootFolder() {
 	return BPT_FOLDER_ROOT;
 }
 
-string dataFolder() {
+string tree::dataFolder() {
 	return rootFolder() + BPT_FOLDER_DATA;
 }
 
-string treeFile() {
+string tree::treeFile() {
 	return dataFolder() + BPT_FILE_TREE;
 }
 
-string debugFile() {
+string tree::debugFile() {
 	return dataFolder() + BPT_FILE_DEBUG;
 }
 
-string trainingFolder() {
+string tree::trainingFolder() {
 	return dataFolder() + BPT_FOLDER_TRAINING;
 }
 
-string datasetFile() {
+string tree::datasetFile() {
 	return dataFolder() + BPT_FILE_DATASET;
 }
 
-string classifiedImagesFolder() {
+string tree::classifiedImagesFolder() {
 	return trainingFolder() + BPT_FOLDER_CLASSIFIED_IMAGES;
 }
 
-string depthImagesFolder() {
+string tree::depthImagesFolder() {
 	return trainingFolder() + BPT_FOLDER_DEPTH_IMAGES;
 }

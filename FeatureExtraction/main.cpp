@@ -7,6 +7,7 @@
 #include "Features.hpp"
 #include "DecTree.h"
 #include "TreeConstants.h"
+#include "TreeSettings.h"
 
 using namespace std;
 using namespace cv;

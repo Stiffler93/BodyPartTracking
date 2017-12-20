@@ -9,6 +9,7 @@ using namespace std;
 const static unsigned short MAX_VAL = 65535;
 const static int MAX_ROW = 240;
 const static int MAX_COL = 320;
+const static int FPS = 30;
 const static int DEPTH_IMAGE = 2; //= CV_16U
 const static int MIN_DIST = 5000;
 
