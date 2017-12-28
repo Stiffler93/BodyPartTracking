@@ -1,4 +1,5 @@
 #include "Tests.h"
+#include "CategoryUtils.h"
 
 using namespace tree;
 
@@ -9,7 +10,7 @@ void testWithTrainingData(tree::Node * decisionTree)
 	ifstream features(dataset);
 
 	int feat1, feat2, feat3, feat4, feat5, feat6, feat7, feat8, feat9, feat10;
-	string category;
+	int category;
 	int total = 0, correctClass = 0, falseClass = 0;
 	vector<Result> results;
 
@@ -25,7 +26,7 @@ void testWithTrainingData(tree::Node * decisionTree)
 		set.feature[7] = feat8;
 		set.feature[8] = feat9;
 		set.feature[9] = feat10;
-		set.outcome = category;
+		set.outcome = categoryOfValue(category);
 
 		total++;
 
@@ -39,7 +40,7 @@ void testWithTrainingData(tree::Node * decisionTree)
 		else {
 			if (results.size() == 1) {
 				Result res = results.at(0);
-				if (res.outcome == category) {
+				if (res.outcome == set.outcome) {
 					correctClass++;
 				}
 				else {
@@ -52,7 +53,7 @@ void testWithTrainingData(tree::Node * decisionTree)
 				float prob = 0;
 
 				for (Result res : results)
-					if (res.outcome == category) {
+					if (res.outcome == set.outcome) {
 						found = true;
 						prob = res.probability;
 					}

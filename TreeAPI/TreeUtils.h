@@ -4,6 +4,7 @@
 #include "DecTree.h"
 #include "TreeSettings.h"
 #include <vector>
+#include "TreeConstants.h"
 
 void printTree(tree::Node * node);
 

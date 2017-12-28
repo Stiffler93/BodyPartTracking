@@ -9,19 +9,29 @@
 #include <vector>
 #include <map>
 #include "TreeSettings.h"
+#include "CategoryUtils.h"
 
 using namespace std;
 
 namespace tree {
 
 typedef struct Dataset {
-	int feature[BPT_NUM_FEATURES]; // think about a better way to use numFeatures()
+	short feature[BPT_NUM_FEATURES]; // think about a better way to use numFeatures()
 	string outcome;
+
+	unsigned short* toArray() {
+		const int number = BPT_NUM_FEATURES + 1;
+		unsigned short arr[number];
+		memcpy(arr, feature, sizeof(int) * BPT_NUM_FEATURES);
+		arr[number - 1] = categoryToValue(outcome);
+
+		return arr;
+	};
 	string toString() {
 		stringstream ss;
 		for (int i = 0; i < numFeatures(); i++)
 			ss << feature[i] << " ";
-		ss << outcome;
+		ss << categoryToValue(outcome);
 		return ss.str();
 	};
 } Dataset;

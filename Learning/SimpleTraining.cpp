@@ -1,30 +1,37 @@
 #include "SimpleTraining.h"
+#include <map>
+#include <cmath>
+#include "CategoryUtils.h"
 
 float impurity(Dataset* trData, int numTrData) {
-	vector<string> classes;
+	map<string, int> category_counts;
 
 	for (int i = 0; i < numTrData; i++) {
 		string name = trData[i].outcome;
-
-		vector<string>::iterator it = classes.begin();
-		for (int index = 0; it != classes.end(); ++it, ++index) {
-			if (*it == name)
-				break;
-
-			if (*it > name) {
-				classes.insert(it, name);
-				break;
-			}
+		
+		std::map<string, int>::iterator it = category_counts.find(name);
+		if (it == category_counts.end()) {
+			printf("Insert %s with value 1.\n", name.c_str());
+			category_counts.insert(std::pair<string, int>(name, 1));
 		}
-
-		if (it == classes.end()) {
-			classes.push_back(name);
+		else {
+			it->second++;
+			printf("Increase %s to value %d.\n", name.c_str(), it->second);
 		}
 	}
 
-	float numClasses = (float)classes.size();
+	double impurity = 1;
+	double reduction;
+	for (std::map<string, int>::iterator it = category_counts.begin(); it != category_counts.end(); ++it) {
+		reduction = pow(((double) it->second / (double) numTrData), 2);
+		printf("Reduce Impurity %lf ", impurity);
+		impurity -= reduction;
+		printf("by %lf to %lf.\n", reduction, impurity);
+	}
 
-	return (float)1 - (1 / numClasses);
+	printf("Return Impurity >%lf<\n", impurity);
+
+	return (float) impurity;
 }
 
 void partition(Partition* part, Dataset* trData, int numTrData, Decision decision) {
@@ -46,11 +53,17 @@ float infoGain(Partition partition, float current_uncertainty) {
 	float fBs = (float)partition.false_branch_size;
 	float tBs = (float)partition.true_branch_size;
 
+	printf("Partition split: %d/%d\n", partition.false_branch_size, partition.true_branch_size);
+
 	float p = fBs / (fBs + tBs);
+	printf("Impurity False Branch: \n");
 	float impFalse = impurity(partition.false_branch, partition.false_branch_size);
+	printf("Impurity True Branch: \n");
 	float impTrue = impurity(partition.true_branch, partition.true_branch_size);
 
 	float infoGain = (current_uncertainty - p * impFalse - (1 - p) * impTrue);
+
+	printf("InfoGain = (%f - %f * %f - (1 - %f) * %f) = %f\n", current_uncertainty, p, impFalse, p, impTrue, infoGain);
 
 	return infoGain;
 }
@@ -83,6 +96,7 @@ UniqueValues calcUniqueVals(Dataset* trData, int numTrData, int feature) {
 }
 
 BestSplit findBestSplit(Dataset* trData, int numTrData) {
+	printf("current Uncertainty: \n");
 	float current_uncertainty = impurity(trData, numTrData);
 	BestSplit split;
 
@@ -101,7 +115,12 @@ BestSplit findBestSplit(Dataset* trData, int numTrData) {
 			if (part.false_branch_size == 0 || part.true_branch_size == 0)
 				continue;
 
+			if (feat != 0)
+				break;
+
 			float gain = infoGain(part, current_uncertainty);
+
+			//printf("Feature = %d, Value = %d, Current Uncertainty = %f, Information Gain = %f\n", feat, *it, current_uncertainty, gain);
 
 			if (gain >= split.gain) {
 				split.gain = gain;
@@ -172,6 +191,8 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData) {
 	partition(&part, trData, numTrData, split.decision);
 
 	delete[] trData;
+
+	return;
 
 	if (part.true_branch_size > 0)
 		buildTree(decNode->true_branch, part.true_branch, part.true_branch_size);

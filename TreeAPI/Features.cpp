@@ -1,5 +1,6 @@
 #include "Features.hpp"
 #include <iostream>
+#include <cmath>
 
 void getSubject(Mat& depImg, Mat& depImgSubject) {
 	depImgSubject = depImg.clone();
@@ -33,6 +34,16 @@ void getSubject(Mat& depImg, Mat& depImgSubject) {
 	}
 
 	medianBlur(mask, mask, 3);
+
+	double minVal, maxVal;
+	minMaxIdx(depImgSubject, &minVal, &maxVal, NULL, NULL, mask != 0);
+
+	short min = (short)minVal;
+	short max = (short)maxVal;
+
+	depImgSubject -= min;
+	double factor = (1.0 / (double) (max - min) *  (double) NORM_FACTOR);
+	depImgSubject *= factor;
 
 	depImgSubject.setTo(0, mask == 0);
 }
@@ -153,9 +164,11 @@ void feature1(Mat& depImg, Mat& feature1, int offset) {
 				rdEdge = depImg.at<ushort>(refPixRow, refPixCol);
 			
 			if (luEdge == 0 || ldEdge == 0 || ruEdge == 0 || rdEdge == 0)
-				feature1.at<ushort>(row, col) = MAX_VAL;
-			else
-				feature1.at<ushort>(row, col) = abs(luEdge + rdEdge - ldEdge - ruEdge);
+				feature1.at<ushort>(row, col) = NORM_FACTOR;
+			else {
+				short val = abs(luEdge + rdEdge - ldEdge - ruEdge) / 2; // division by 2 because max value can be 2 * NORM_FACTOR but max is supposed to be NORM_FACTOR
+				feature1.at<ushort>(row, col) = val;
+			}
 		}
 	}
 }

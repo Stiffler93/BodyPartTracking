@@ -4,6 +4,8 @@
 #include <ctime>
 #include "Tests.h"
 #include "SimpleTraining.h"
+#include "ParallelTraining.h"
+#include "CategoryUtils.h"
 
 using namespace tree;
 
@@ -13,6 +15,14 @@ void readTrainingData(string inputfile, Dataset* trData, int* numTrData);
 
 void test(Dataset test, Node* decisionTree);
 
+
+int main_par(int argc, char** argv) {
+	// test main for ParallelTraining
+	Node* n;
+	startParallelTraining(NULL, 0, n);
+
+	return 0;
+}
 
 int main(int argc, char** argv) 
 {
@@ -52,7 +62,8 @@ int main(int argc, char** argv)
 	clock_t begin = clock();
 
 	Node* decisionTree = NULL;
-	startSimpleTraining(trData, numTrData, decisionTree);
+	//startSimpleTraining(trData, numTrData, decisionTree);
+	startParallelTraining(trData, numTrData, decisionTree);
 
 	clock_t end = clock();
 	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
@@ -76,7 +87,6 @@ int main(int argc, char** argv)
 	//trData must not be deleted, because is already during Training
 
 	printf("SUCCESSFULLY built DECISION TREE\n");
-	printf("Press enter...");
 	string c;
 	cin >> c;
 
@@ -131,7 +141,7 @@ void readTrainingData(string inputfile, Dataset* trData, int* numTrData)
 	trace("readTrainingData()");
 
 	int feat;
-	string category;
+	int category;
 
 	ifstream trDataset(inputfile);
 	while (trDataset >> feat) {
@@ -141,7 +151,7 @@ void readTrainingData(string inputfile, Dataset* trData, int* numTrData)
 			trData[*numTrData].feature[i] = feat;
 		}
 		trDataset >> category;
-		trData[*numTrData].outcome = category;
+		trData[*numTrData].outcome = categoryOfValue(category);
 		
 		(*numTrData)++;
 	}

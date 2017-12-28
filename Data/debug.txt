@@ -1,1 +1,18 @@
-Start Debug:
+Read training Data from folder C:\Users\Stefan\Desktop\Master\Masterarbeit\Programme\BodyPartTracking\Data\dataset_parallel_test.txt
+checkTreeFile()
+Tree file = C:\Users\Stefan\Desktop\Master\Masterarbeit\Programme\BodyPartTracking\Data\tree_parallel_test.txt
+checkTrainingInput()
+readTrainingData()
+Parsed input training data.
+1 >1000 1 1 1 1 885 0 0 900 969 2<
+2 >1000 1 1 1 1 873 0 0 0 911 2<
+3 >1000 1 1 196 878 783 0 895 781 121 1<
+4 >1000 1 33 82 18 189 110 91 783 116 5<
+5 >1000 1 36 82 16 182 103 82 783 116 5<
+6 >1000 14 143 140 1 147 60 27 779 116 3<
+7 >1000 15 250 140 3 142 53 18 779 116 3<
+8 >1000 1 83 1 876 777 861 0 868 802 0<
+9 >1000 1 83 1 876 777 864 0 866 802 0<
+10 >1000 1 100 1 880 777 864 0 866 804 0<
+11 >8 125 984 38 26 822 14 11 20 31 4<
+12 >1000 1 143 1 883 777 866 0 864 803 0<
