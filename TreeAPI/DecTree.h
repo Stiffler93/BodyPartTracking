@@ -22,7 +22,7 @@ typedef struct Dataset {
 	unsigned short* toArray() {
 		const int number = BPT_NUM_FEATURES + 1;
 		unsigned short arr[number];
-		memcpy(arr, feature, sizeof(int) * BPT_NUM_FEATURES);
+		memcpy(arr, feature, sizeof(short) * BPT_NUM_FEATURES);
 		arr[number - 1] = categoryToValue(outcome);
 
 		return arr;

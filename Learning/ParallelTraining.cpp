@@ -8,9 +8,13 @@
 
 void checkError(int error, std::string message);
 
-cl::Kernel* kernel(cl::Context context, cl::Device device, string file) {
+cl::Kernel* kernel(cl::Context context, cl::Device device, string file, std::map<string, string> macros = std::map<string,string>()) {
 	std::stringstream ss;
 	std::string s;
+
+	for (std::map<string, string>::iterator it = macros.begin(); it != macros.end(); ++it) {
+		ss << "#define " << it->first << " " << it->second << std::endl;
+	}
 
 	ifstream readKernel(file);
 	while (std::getline(readKernel, s)) {
@@ -40,17 +44,312 @@ cl::Kernel* kernel(cl::Context context, cl::Device device, string file) {
 		start = 0;
 
 	kernelName = file.substr(start, end - start);
-	printf("Kernel name: %s. Program built successfully.\n", kernelName.c_str());
 
 	cl::Kernel* k = new cl::Kernel(program, kernelName.c_str(), &err);
-
 	checkError(err, "Kernel creation failed!");
 
 	return k;
 }
 
-int trainingsLoop() {
+int partition(Partition* part, Dataset* trData, int numTrData, Decision decision) {
+	part->false_branch_size = part->true_branch_size = 0;
 
+	for (int i = 0; i < numTrData; i++) {
+		if (decision.decide(trData[i])) {
+			part->true_branch[part->true_branch_size] = trData[i];
+			part->true_branch_size++;
+		}
+		else {
+			part->false_branch[part->false_branch_size] = trData[i];
+			part->false_branch_size++;
+		}
+	}
+
+	return 0;
+}
+
+void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& context, cl::Device& device, cl::CommandQueue& queue) {
+	printf("Call trainingsLoop(). numTrData = %d\n", numTrData);
+	//printf("TrData: \n");
+	//for (int i = 1; i <= numTrData; i++) {
+	//	printf("\t%d.: >%s<\n", i, trData[i - 1].toString().c_str());
+	//}
+
+	cl_int err = 0;
+	const int NUM_VALS_PER_FEATURE = NORM_FACTOR + 1;
+	const unsigned int NUM_COMPUTE_UNITS = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
+	//printf("Max num Compute Units = %d\n", NUM_COMPUTE_UNITS);
+
+	short datasetLength = (numFeatures() + 1);
+	unsigned long datasetValues = datasetLength * numTrData;
+	printf("DatasetValues = %ld\n", datasetValues);
+	unsigned short* dataset = new unsigned short[datasetValues]; //1.331.680 Byte throws: C++-Ausnahme: std::bad_array_new_length
+
+	cl::Buffer* impurity_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(unsigned int) * NUM_CATEGORIES, NULL, &err);
+	checkError(err, "impurity_buffer <could not be created");
+	cl::Buffer* dataset_buffer = new cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(unsigned short) * datasetValues, NULL, &err);
+	checkError(err, "dataset_buffer could not be created");
+	// best split (= 2 values), current uncertainty and best information gain
+	cl::Buffer* temp_values_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(double) * 4, NULL, &err);
+	checkError(err, "temp_values could not be created");
+
+	Dataset set;
+	for (int i = 0, offset = 0; i < numTrData; i++, offset += datasetLength) {
+		set = trData[i];
+		unsigned short* arr = set.toArray();
+		memcpy(dataset + offset, arr, datasetLength * sizeof(unsigned short));
+	}
+
+	err = queue.enqueueWriteBuffer(*dataset_buffer, CL_TRUE, 0, sizeof(unsigned short) * datasetValues, dataset);
+	checkError(err, "writing dataset to buffer failed.");
+
+	delete[] dataset;
+
+	unsigned int* imp_buffer = new unsigned int[NUM_CATEGORIES];
+	for (int i = 0; i < NUM_CATEGORIES; i++)
+		imp_buffer[i] = 0;
+
+	err = queue.enqueueWriteBuffer(*impurity_buffer, CL_TRUE, 0, sizeof(unsigned int) * NUM_CATEGORIES, imp_buffer);
+	checkError(err, "writing imp_buffer to buffer failed.");
+
+	delete[] imp_buffer;
+
+	/*std::map<string, string> macros1;
+	macros1.insert(std::pair<string, string>("NUM_DATASETS", to_string(numTrData)));*/
+
+	cl::Kernel* kernel_calc_impurity = kernel(context, device, "CalcImpurity.cl");
+	kernel_calc_impurity->setArg(0, *dataset_buffer);
+	kernel_calc_impurity->setArg(1, *impurity_buffer);
+	kernel_calc_impurity->setArg(2, numTrData);
+
+	// invalid workitem size!!
+	int tenthOfNumTrData = (int) ceil((double)numTrData / (double)NUM_COMPUTE_UNITS);
+	int work_item_per_group = std::min(256, tenthOfNumTrData);
+	int multiplicator = (int)ceil((double)numTrData / (double)work_item_per_group);
+	printf("GPU Global/Local Sizes: %d/%d\n", work_item_per_group * multiplicator, work_item_per_group);
+	err = queue.enqueueNDRangeKernel(*kernel_calc_impurity, cl::NullRange, cl::NDRange(work_item_per_group * multiplicator), cl::NDRange(work_item_per_group));
+	checkError(err, "enqueueing kernel_calc_impurity failed.");
+
+	delete kernel_calc_impurity;
+
+	cl::Kernel* kernel_calc_impurity2 = kernel(context, device, "CalcImpurity2.cl");
+	kernel_calc_impurity2->setArg(0, *impurity_buffer);
+	kernel_calc_impurity2->setArg(1, *temp_values_buffer);
+	kernel_calc_impurity2->setArg(2, numTrData);
+
+	err = queue.enqueueNDRangeKernel(*kernel_calc_impurity2, cl::NullRange, cl::NDRange(NUM_CATEGORIES), cl::NDRange(NUM_CATEGORIES));
+	checkError(err, "enqueueing kernel_calc_impurity2 failed.");
+
+	delete kernel_calc_impurity2;
+
+	double impurity = 0;
+	err = queue.enqueueReadBuffer(*temp_values_buffer, CL_TRUE, 2 * sizeof(double), sizeof(double), &impurity);
+
+	//printf("Dataset Impurity = %lf\n", impurity);
+
+	if (impurity < 0 || impurity > 1) {
+		printf("Impurity >%lf< is wrong! Exit program!\n", impurity);
+		exit(1);
+	}
+
+	BestSplit split;
+
+	if (impurity != 0) {
+		cl::Buffer* unique_vals_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(unsigned char) * NUM_VALS_PER_FEATURE * numFeatures(), NULL, &err);
+		checkError(err, "unique_vals_buffer could not be created");
+
+		//printf("Impurity != 0 -> Find Best Split!\n");
+		cl::Kernel* kernel_calc_unique_vals = kernel(context, device, "CalcUniqueVals.cl");
+		kernel_calc_unique_vals->setArg(0, *dataset_buffer);
+		kernel_calc_unique_vals->setArg(1, *unique_vals_buffer);
+
+		unsigned char* empty_buffer = new unsigned char[NUM_VALS_PER_FEATURE * numFeatures()];
+		for (int i = 0; i < NUM_VALS_PER_FEATURE * numFeatures(); i++) {
+			empty_buffer[i] = 0;
+		}
+		err = queue.enqueueWriteBuffer(*unique_vals_buffer, CL_TRUE, 0, sizeof(unsigned char) * NUM_VALS_PER_FEATURE * numFeatures(), empty_buffer);
+		delete[] empty_buffer;
+
+		//printf("DatasetValues = %d\n", datasetValues);
+		err = queue.enqueueNDRangeKernel(*kernel_calc_unique_vals, cl::NullRange, cl::NDRange(datasetValues));
+		checkError(err, "enqueueing kernel_calc_unique_vals failed.");
+
+		delete kernel_calc_unique_vals;
+
+		unsigned char* uniqueVals = new unsigned char[numFeatures() * NUM_VALS_PER_FEATURE];
+		err = queue.enqueueReadBuffer(*unique_vals_buffer, CL_TRUE, 0, sizeof(unsigned char) * NUM_VALS_PER_FEATURE * numFeatures(), uniqueVals);
+		checkError(err, "reading unique_vals_buffer failed.");
+
+		delete unique_vals_buffer;
+
+		int numUniqueVals = 0;
+		std::vector<short> values;
+		for (short f = 0; f < numFeatures(); f++) {
+			for (short ind = 0; ind < NUM_VALS_PER_FEATURE; ind++) {
+				if (uniqueVals[f * NUM_VALS_PER_FEATURE + ind] == 1) {
+					numUniqueVals++;
+					values.push_back(f);
+					values.push_back(ind);
+				}
+			}
+		}
+
+		delete[] uniqueVals;
+
+		//printf("NumUniqueVals = %d\n", numUniqueVals);
+
+		unsigned short* splitInfo = new unsigned short[numUniqueVals * 2];
+		for (int i = 0; i < numUniqueVals * 2; i += 2) {
+			splitInfo[i] = values.at(i);
+			splitInfo[i + 1] = values.at(i + 1);
+		}
+
+		cl::Buffer* split_info_buffer = new cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(unsigned short) * numUniqueVals * 2, NULL, &err);
+		checkError(err, "split_info_buffer could not be created");
+
+		err = queue.enqueueWriteBuffer(*split_info_buffer, CL_TRUE, 0, sizeof(unsigned short) * numUniqueVals * 2, splitInfo);
+		checkError(err, "writing splitInfo to buffer failed.");
+
+		cl::Buffer* split_info_gain_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(double) * numUniqueVals, NULL, &err);
+		checkError(err, "split_info_gain_buffer could not be created");
+
+		int nextSquareOfTwo = 2;
+		while (nextSquareOfTwo < numTrData)
+			nextSquareOfTwo *= 2;
+
+		std::map<string, string> macros;
+		macros.insert(std::pair<string, string>("NUM_DATASETS", to_string(numTrData)));
+		macros.insert(std::pair<string, string>("NEXT_SQUARE_OF_TWO", to_string(nextSquareOfTwo)));
+
+		//NUM_DATASETS: 665840, NEXT_SQUARE_OF_TWO: 1048576
+		printf("NUM_DATASETS: %d, NEXT_SQUARE_OF_TWO: %d\n", numTrData, nextSquareOfTwo);
+
+		// Error building: Error:E012:Insufficient Local Resources!
+		// Error Code : -11
+		cl::Kernel* kernel_best_split = kernel(context, device, "FindBestSplit.cl", macros);
+		kernel_best_split->setArg(0, *dataset_buffer);
+		kernel_best_split->setArg(1, *temp_values_buffer);
+		kernel_best_split->setArg(2, *split_info_buffer);
+		kernel_best_split->setArg(3, *split_info_gain_buffer);
+
+		work_item_per_group = std::min(256, numTrData * 2);
+
+		err = queue.enqueueNDRangeKernel(*kernel_best_split, cl::NullRange, cl::NDRange(numUniqueVals * work_item_per_group), cl::NDRange(work_item_per_group));
+		checkError(err, "enqueueing kernel_partition_data failed.");
+
+		delete kernel_best_split;
+		delete split_info_buffer;
+
+		double* read_split_info_gain = new double[numUniqueVals];
+		err = queue.enqueueReadBuffer(*split_info_gain_buffer, CL_TRUE, 0, sizeof(double) * numUniqueVals, read_split_info_gain);
+		checkError(err, "split_info_gain_buffer could not be read.");
+
+		delete split_info_gain_buffer;
+
+		const int FACTOR = 1000000;
+		for (int i = 0; i < numUniqueVals; i++) {
+			int newGain = (int) (read_split_info_gain[i] * FACTOR);
+			int oldGain = (int) (split.gain * FACTOR);
+			if (/*(float) read_split_info_gain[i] > (float) split.gain*/ newGain > oldGain) {
+				split.gain = (float) read_split_info_gain[i];
+				split.decision.feature = splitInfo[i * 2];
+				split.decision.refVal = splitInfo[i * 2 + 1];
+				//printf("newGain = %d, oldGain = %d\n", newGain, oldGain);
+				//printf("%Lf > %Lf -> new Decision >%d,%d< found!\n", read_split_info_gain[i], split.gain, split.decision.feature, split.decision.refVal);
+			}
+		}
+
+		delete[] read_split_info_gain;
+		delete[] splitInfo;
+
+		//printf("Best Info Gain = %lf for Feature %d with Value %d\n", split.gain, split.decision.feature, split.decision.refVal);
+	}
+
+	delete impurity_buffer;
+	delete dataset_buffer;
+	delete temp_values_buffer;
+
+	//printf("Buffer deleted.\n");
+
+	//printf("Split gain = %lf\n", split.gain);
+
+	if (split.gain == 0) {
+		//printf("Gain == 0 -> ResultNode\n");
+		if (numTrData == 1 || impurity == 0) {
+			Result res;
+			res.outcome = trData[0].outcome;
+			res.probability = 1.0;
+			//printf("--> ResultNode(%s,%lf).\n", res.outcome.c_str(), res.probability);
+			node = (Node*) new ResultNode(res);
+		}
+		else {
+			map<string, int> results;
+			for (int i = 0; i < numTrData; i++) {
+				string category = trData[i].outcome;
+				map<string, int>::iterator val = results.lower_bound(category);
+
+				if (val != results.end() && !(results.key_comp()(category, val->first))) {
+					val->second++;
+				}
+				else {
+					results.insert(val, map<string, int>::value_type(category, 1));
+				}
+			}
+
+			int size = (int)results.size();
+			int sum = 0;
+			for (auto it : results) {
+				sum += it.second;
+			}
+
+			vector<Result> endRes;
+			for (auto it : results) {
+				Result r;
+				r.outcome = it.first;
+				r.probability = (float)it.second / (float)sum;
+				endRes.push_back(r);
+			}
+
+			//printf("--> ResultNode(%s,%lf).\n", endRes[0].outcome.c_str(), endRes[0].probability);
+
+			node = (Node*) new ResultNode(endRes);
+		}
+
+		delete[] trData;
+
+		return;
+	}
+
+	//printf("Split Gain != 0\n");
+
+	//printf("--> DecisionNode(%d,%d).\n", split.decision.feature, split.decision.refVal);
+	node = (Node*) new DecisionNode(split.decision);
+
+	Partition part;
+	part.true_branch = new Dataset[numTrData];
+	part.false_branch = new Dataset[numTrData];
+
+	int a = partition(&part, trData, numTrData, split.decision);
+
+	//printf("True-Branch Split: \n");
+	//for (int i = 0; i < part.true_branch_size; i++) {
+	//	printf("\t%d.: >%s<\n", i, part.true_branch[i].toString().c_str());
+	//}
+
+	//printf("False-Branch Split: \n");
+	//for (int i = 0; i < part.false_branch_size; i++) {
+	//	printf("\t%d.: >%s<\n", i, part.false_branch[i].toString().c_str());
+	//}
+
+	//printf("\n");
+
+	delete[] trData;
+
+	if (part.true_branch_size > 0)
+		trainingsLoop(part.true_branch, part.true_branch_size, node->true_branch, context, device, queue);
+
+	if (part.false_branch_size > 0)
+		trainingsLoop(part.false_branch, part.false_branch_size, node->false_branch, context, device, queue);
 }
 
 void startParallelTraining(Dataset * trData, int numTrData, Node *& rootNode)
@@ -87,212 +386,15 @@ void startParallelTraining(Dataset * trData, int numTrData, Node *& rootNode)
 	cl::Device default_device = all_devices[0];
 	std::cout << "Using device: " << default_device.getInfo<CL_DEVICE_NAME>() << "\n";
 
-	cl::vector<cl::size_type> sizes = default_device.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>();
-	std::cout << "CL_DEVICE_MAX_WORK_ITEM_SIZES: >";
-	for (cl::size_type s : sizes) {
-		std::cout << s << ",";
-	}
-	std::cout << std::endl;
-
-	std::cout << "CL_DEVICE_MAX_WORK_GROUP_SIZE" << default_device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << std::endl;
+	//Local Memory Size: 32768
+	std::cout << "Local Memory Size: " << default_device.getInfo<CL_DEVICE_LOCAL_MEM_SIZE>() << std::endl;
 
 	cl::Context context({ default_device });
-
-	////////----------------------------------
-	//	Create Buffer here
-	////////----------------------------------
-
-	short datasetLength = (short)(numFeatures() + 1);
-	short datasetValues = datasetLength * numDatasets();
-	std::cout << "Dataset Length: >" << datasetLength << "<, Dataset Values: >" << datasetValues << "<" << std::endl;
-	unsigned short* dataset = new unsigned short[datasetValues];
-
-	cl::Buffer impurity_buffer_1(context, CL_MEM_READ_WRITE, sizeof(unsigned int) * NUM_CATEGORIES, NULL, &err);
-	checkError(err, "impurity_buffer_1 <could not be created");
-	cl::Buffer impurity_buffer_2(context, CL_MEM_READ_WRITE, sizeof(unsigned int) * NUM_CATEGORIES, NULL, &err);
-	checkError(err, "impurity_buffer_2 could not be created");
-	cl::Buffer dataset_buffer(context, CL_MEM_READ_ONLY, sizeof(unsigned short) * datasetValues, NULL, &err);
-	checkError(err, "dataset_buffer could not be created");
-	cl::Buffer unique_vals_buffer(context, CL_MEM_READ_WRITE, sizeof(unsigned char) * 1001 * numFeatures(), NULL, &err);
-	checkError(err, "unique_vals_buffer could not be created");
-	/*cl::Buffer split_buffer_1(context, CL_MEM_READ_WRITE, sizeof(unsigned short) * numDatasets(), NULL, &err);
-	checkError(err, "split_buffer_1 could not be created");
-	cl::Buffer split_buffer_2(context, CL_MEM_READ_WRITE, sizeof(unsigned short) * numDatasets(), NULL, &err);
-	checkError(err, "split_buffer_2 could not be created");*/
-	// best split (= 2 values), current uncertainty and best information gain
-	cl::Buffer temp_values(context, CL_MEM_READ_WRITE, sizeof(double) * 4, NULL, &err);
-	checkError(err, "temp_values could not be created");
-
-	short offset = 0;
-
-	for (int i = 0; i < numTrData; i++, offset += datasetLength) {
-		Dataset set = trData[i];
-		unsigned short* arr = set.toArray();
-		memcpy(dataset + offset, arr, datasetLength * sizeof(unsigned short));
-	}
-
-	printf("Content of dataset:\n");
-	for (int i = 0; i < numDatasets(); i++) {
-		for (int j = 0; j < datasetLength; j++) {
-			printf("%d ", dataset[i * datasetLength + j]);
-		}	
-		printf("\n");
-	}
 
 	cl::CommandQueue queue(context, default_device, NULL, &err);
 	checkError(err, "CommandQueue creation failed!");
 
-	err = queue.enqueueWriteBuffer(dataset_buffer, CL_TRUE, 0, sizeof(unsigned short) * datasetValues, dataset);
-	checkError(err, "writing dataset to buffer failed.");
-
-	delete[] dataset;
-
-	////////----------------------------------
-	//	Create Kernel here
-	////////----------------------------------
-
-	cl::Kernel* kernel_calc_impurity = kernel(context, default_device, "CalcImpurity.cl");
-	//std::cout << "CL_KERNEL_WORK_GROUP_SIZE: " << kernel_calc_impurity->getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(default_device) << std::endl;
-	kernel_calc_impurity->setArg(0, dataset_buffer);
-	kernel_calc_impurity->setArg(1, impurity_buffer_1);
-	kernel_calc_impurity->setArg(2, temp_values);
-
-	cl::Kernel* kernel_calc_unique_vals = kernel(context, default_device, "CalcUniqueVals.cl");
-	kernel_calc_unique_vals->setArg(0, dataset_buffer);
-	kernel_calc_unique_vals->setArg(1, unique_vals_buffer);
-
-	////////----------------------------------
-	//	Handle Kernels
-	////////----------------------------------
-
-	err = queue.enqueueNDRangeKernel(*kernel_calc_impurity, cl::NullRange, cl::NDRange(numDatasets()), cl::NDRange(3));
-	checkError(err, "enqueueing kernel_calc_impurity failed.");
-
-	////////----------------------------------
-	//	Read results and figure out how to recursively start over on subsets
-	////////----------------------------------
-
-	unsigned int imp[NUM_CATEGORIES];
-	err = queue.enqueueReadBuffer(impurity_buffer_1, CL_TRUE, 0, sizeof(unsigned int) * NUM_CATEGORIES, imp);
-	checkError(err, "enqueueReadBuffer impurity_buffer_1 unsuccessful.");
-
-	double impurity = 1;
-	for (int i = 0; i < NUM_CATEGORIES; i++) {
-		impurity -= pow(imp[i] / (double) numDatasets(), 2);
-	}
-
-	printf("CPU calculated Impurity: %lf\n", impurity);
-
-	double temp[4];
-	err = queue.enqueueReadBuffer(temp_values, CL_TRUE, 0, sizeof(double) * 4, temp);
-	checkError(err, "enqueueReadBuffer temp_values unsuccessful.");
-
-	if (std::abs(impurity - temp[2]) > 0.0001) {
-		std::cerr << "GPU and CPU calculated impurity differ more than 0.0001! -> abort program." << std::endl;
-		exit(1);
-	}
-
-	////////----------------------------------
-	//	Handle Kernels
-	////////----------------------------------
-
-	err = queue.enqueueNDRangeKernel(*kernel_calc_unique_vals, cl::NullRange, cl::NDRange(datasetValues));
-	checkError(err, "enqueueing kernel_calc_unique_vals failed.");
-
-	unsigned char uniqueVals[10010];
-	err = queue.enqueueReadBuffer(unique_vals_buffer, CL_TRUE, 0, sizeof(unsigned char) * 1001 * numFeatures(), uniqueVals);
-	checkError(err, "reading unique_vals_buffer failed.");
-	const int NUM_VALS_PER_FEATURE = NORM_FACTOR + 1;
-
-	int numUniqueVals = 0;
-	std::vector<short> values;
-	for (short f = 0; f < numFeatures(); f++) {
-		for (short ind = 0; ind <= NORM_FACTOR; ind++) {
-			if (uniqueVals[f * NUM_VALS_PER_FEATURE + ind] == 1) {
-				//printf("Feature %d - unique Val: %d\n", f, ind);
-				numUniqueVals++;
-				values.push_back(f);
-				values.push_back(ind);
-			}
-		}
-	}
-
-	unsigned short* splitInfo = new unsigned short[numUniqueVals * 2];
-	for (int i = 0; i < numUniqueVals * 2; i++) {
-		splitInfo[i] = values.at(i);
-	}
-
-	////////----------------------------------
-	//	Handle Kernels
-	////////----------------------------------
-	cl::Buffer split_info_buffer(context, CL_MEM_READ_ONLY, sizeof(unsigned short) * numUniqueVals * 2, NULL, &err);
-	checkError(err, "unique_vals_buffer could not be created");
-
-	cl::Buffer read_split_info_buffer(context, CL_MEM_READ_WRITE, sizeof(unsigned short) * numUniqueVals * 16 * 2, NULL, &err);
-	checkError(err, "read_split_info_buffer could not be created");
-
-	cl::Buffer split_info_gain_buffer(context, CL_MEM_READ_WRITE, sizeof(double) * numUniqueVals, NULL, &err);
-	checkError(err, "split_info_gain_buffer could not be created");
-	
-	cl::Buffer category_buffer(context, CL_MEM_READ_WRITE, sizeof(unsigned short) * 12, NULL, &err);
-	checkError(err, "category_buffer could not be created");
-
-	err = queue.enqueueWriteBuffer(split_info_buffer, CL_TRUE, 0, sizeof(unsigned short) * numUniqueVals * 2, splitInfo);
-	checkError(err, "writing splitInfo to buffer failed.");
-
-	cl::Kernel* kernel_partition_data = kernel(context, default_device, "PartitionData.cl");
-	kernel_partition_data->setArg(0, dataset_buffer);
-	kernel_partition_data->setArg(1, temp_values);
-	kernel_partition_data->setArg(2, split_info_buffer);
-	kernel_partition_data->setArg(3, read_split_info_buffer);
-	kernel_partition_data->setArg(4, split_info_gain_buffer);
-	kernel_partition_data->setArg(5, category_buffer);
-
-	int work_item_per_group = std::min(1024, numDatasets());
-
-	err = queue.enqueueNDRangeKernel(*kernel_partition_data, cl::NullRange, cl::NDRange(numUniqueVals * work_item_per_group), cl::NDRange(work_item_per_group));
-	checkError(err, "enqueueing kernel_partition_data failed.");
-	queue.finish();
-
-	unsigned short* readSplit = new unsigned short[numUniqueVals * 16 * 2];
-	err = queue.enqueueReadBuffer(read_split_info_buffer, CL_TRUE, 0, sizeof(unsigned short) * numUniqueVals * 2 * 16, readSplit);
-	checkError(err, "reading read_split_info_buffer failed.");
-
-	offset = 32;
-	int result = 0;
-	for (int i = 0; i < numUniqueVals; i++) {
-		int sum = readSplit[i*offset] + readSplit[i*offset + 16];
-		if (sum != 12 && sum != 0) {	// 0 for skipped kernels, because split resulted in branch with size 0!
-			printf("FAILED: ");
-		}
-		else
-			continue;
-		printf("Group ID %d calculated: >", i);
-		for (int j = 0; j < 15; j++) {
-			printf("%d,", readSplit[i*offset + j]);
-		}
-		printf("%d< and >", readSplit[i*offset + 15]);
-
-		for (int j = 0; j < 15; j++) {
-			printf("%d,", readSplit[i*offset + j + 16]);
-		}
-		printf("%d<\n", readSplit[i*offset + 15 + 16]);
-	}
-
-	double* readInfoGain = new double[numUniqueVals];
-	err = queue.enqueueReadBuffer(split_info_gain_buffer, CL_TRUE, 0, sizeof(double) * numUniqueVals, readInfoGain);
-	checkError(err, "reading split_info_gain_buffer failed.");
-
-	for (int i = 0; i < numUniqueVals; i++) {
-		printf("Split on Feature %d with value %d -> Info gain = %lf\n", splitInfo[i * 2], splitInfo[i * 2 + 1], readInfoGain[i]);
-	}
-
-	unsigned short categories[12];
-	err = queue.enqueueReadBuffer(category_buffer, CL_TRUE, 0, sizeof(unsigned short) * 12, categories);
-	checkError(err, "reading category_buffer failed");
-
-	delete[] splitInfo;
-	delete[] readInfoGain;
+	trainingsLoop(trData, numTrData, rootNode, context, default_device, queue);
 
 	std::cout << "Finished." << std::endl;
 }

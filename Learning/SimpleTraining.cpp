@@ -11,12 +11,10 @@ float impurity(Dataset* trData, int numTrData) {
 		
 		std::map<string, int>::iterator it = category_counts.find(name);
 		if (it == category_counts.end()) {
-			printf("Insert %s with value 1.\n", name.c_str());
 			category_counts.insert(std::pair<string, int>(name, 1));
 		}
 		else {
 			it->second++;
-			printf("Increase %s to value %d.\n", name.c_str(), it->second);
 		}
 	}
 
@@ -24,12 +22,8 @@ float impurity(Dataset* trData, int numTrData) {
 	double reduction;
 	for (std::map<string, int>::iterator it = category_counts.begin(); it != category_counts.end(); ++it) {
 		reduction = pow(((double) it->second / (double) numTrData), 2);
-		printf("Reduce Impurity %lf ", impurity);
 		impurity -= reduction;
-		printf("by %lf to %lf.\n", reduction, impurity);
 	}
-
-	printf("Return Impurity >%lf<\n", impurity);
 
 	return (float) impurity;
 }
@@ -53,17 +47,13 @@ float infoGain(Partition partition, float current_uncertainty) {
 	float fBs = (float)partition.false_branch_size;
 	float tBs = (float)partition.true_branch_size;
 
-	printf("Partition split: %d/%d\n", partition.false_branch_size, partition.true_branch_size);
-
 	float p = fBs / (fBs + tBs);
-	printf("Impurity False Branch: \n");
 	float impFalse = impurity(partition.false_branch, partition.false_branch_size);
-	printf("Impurity True Branch: \n");
 	float impTrue = impurity(partition.true_branch, partition.true_branch_size);
 
 	float infoGain = (current_uncertainty - p * impFalse - (1 - p) * impTrue);
 
-	printf("InfoGain = (%f - %f * %f - (1 - %f) * %f) = %f\n", current_uncertainty, p, impFalse, p, impTrue, infoGain);
+	//std::printf("InfoGain = (%f - %f * %f - (1 - %f) * %f) = %f\n", current_uncertainty, p, impFalse, p, impTrue, infoGain);
 
 	return infoGain;
 }
@@ -96,13 +86,19 @@ UniqueValues calcUniqueVals(Dataset* trData, int numTrData, int feature) {
 }
 
 BestSplit findBestSplit(Dataset* trData, int numTrData) {
-	printf("current Uncertainty: \n");
 	float current_uncertainty = impurity(trData, numTrData);
 	BestSplit split;
 
 	Partition part;
 	part.true_branch = new Dataset[numTrData];
 	part.false_branch = new Dataset[numTrData];
+	
+	int numUniqueVals = 0;
+	for (int feat = 0; feat < numFeatures(); feat++) {
+		UniqueValues unVals = calcUniqueVals(trData, numTrData, feat);
+		numUniqueVals += unVals.numVals;
+	}
+	std::printf("NumUniqueVals = %d\n", numUniqueVals);
 
 	for (int feat = 0; feat < numFeatures(); feat++) {
 		UniqueValues unVals = calcUniqueVals(trData, numTrData, feat);
@@ -115,16 +111,16 @@ BestSplit findBestSplit(Dataset* trData, int numTrData) {
 			if (part.false_branch_size == 0 || part.true_branch_size == 0)
 				continue;
 
-			if (feat != 0)
-				break;
-
 			float gain = infoGain(part, current_uncertainty);
+			const int FACTOR = 1000000;
+			int newGain = (int) (gain * FACTOR);
+			int oldGain = (int) (split.gain * FACTOR);
 
-			//printf("Feature = %d, Value = %d, Current Uncertainty = %f, Information Gain = %f\n", feat, *it, current_uncertainty, gain);
-
-			if (gain >= split.gain) {
+			if (/*gain > split.gain*/newGain > oldGain) {
 				split.gain = gain;
 				split.decision = dec;
+				std::printf("newGain = %d, oldGain = %d\n", newGain, oldGain);
+				std::printf("%Lf > %Lf -> new Decision >%d,%d< found!\n", gain, split.gain, split.decision.feature, split.decision.refVal);
 			}
 		}
 	}
@@ -136,14 +132,27 @@ BestSplit findBestSplit(Dataset* trData, int numTrData) {
 }
 
 void buildTree(Node*& decNode, Dataset* trData, int numTrData) {
-	BestSplit split = findBestSplit(trData, numTrData);
+	std::printf("Call buildTree(). numTrData = %d\n", numTrData);
+	std::printf("TrData: \n");
+	bool isHeterogenous = false;
+	string temp = trData[0].outcome;
+	for (int i = 1; i <= numTrData; i++) {
+		if (temp != trData[i - 1].outcome) {
+			isHeterogenous = true;
+		}
+		std::printf("\t%d.: >%s<\n", i, trData[i - 1].toString().c_str());
+	}
+
+	BestSplit split;
+	if(isHeterogenous)
+		split = findBestSplit(trData, numTrData);
 
 	if (split.gain == 0) {
-
 		if (numTrData == 1 || impurity(trData, numTrData) == 0) {
 			Result res;
 			res.outcome = trData[0].outcome;
 			res.probability = 1.0;
+			std::printf("--> ResultNode(%s,%lf).\n", res.outcome.c_str(), res.probability);
 			decNode = (Node*) new ResultNode(res);
 		}
 		else {
@@ -174,6 +183,7 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData) {
 				endRes.push_back(r);
 			}
 
+			std::printf("--> ResultNode(%s,%lf).\n", endRes[0].outcome.c_str(), endRes[0].probability);
 			decNode = (Node*) new ResultNode(endRes);
 		}
 
@@ -182,6 +192,7 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData) {
 		return;
 	}
 
+	std::printf("--> DecisionNode(%d,%d).\n", split.decision.feature, split.decision.refVal);
 	decNode = (Node*) new DecisionNode(split.decision);
 
 	Partition part;
@@ -190,9 +201,19 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData) {
 
 	partition(&part, trData, numTrData, split.decision);
 
-	delete[] trData;
+	std::printf("True-Branch Split: \n");
+	for (int i = 0; i < part.true_branch_size; i++) {
+		std::printf("\t%d.: >%s<\n", i, part.true_branch[i].toString().c_str());
+	}
 
-	return;
+	std::printf("False-Branch Split: \n");
+	for (int i = 0; i < part.false_branch_size; i++) {
+		std::printf("\t%d.: >%s<\n", i, part.false_branch[i].toString().c_str());
+	}
+
+	std::printf("\n");
+
+	delete[] trData;
 
 	if (part.true_branch_size > 0)
 		buildTree(decNode->true_branch, part.true_branch, part.true_branch_size);
