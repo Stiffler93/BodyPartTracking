@@ -1,4 +1,5 @@
 #include "DecTree.h"
+#include "CPUTrainingInterface.h"
 
 using namespace tree;
 

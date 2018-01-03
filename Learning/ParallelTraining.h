@@ -2,6 +2,7 @@
 
 #include <CL/cl2.hpp>
 #include "DecTree.h"
+#include "CPUTrainingInterface.h"
 
 using namespace tree;
 

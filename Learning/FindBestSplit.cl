@@ -1,103 +1,53 @@
 
 #pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 
-#define MAX_LOCAL_MEMORY 32768
+//32768 = max local memory, 8192 is a quarter
+#define MAX_LOCAL_MEMORY 8192
 #define DS_LEN 11
 #define NUM_CATEGORIES 6
 #define CALC_FACTOR 10000000000
 #define CATEGORY 10
-#define OTHER 777
+#define OTHER 0x0E
+#define PARTITION_ONE 0x80
+#define PARTITION_TWO 0x40
+#define CATEGORY_PART 0x0F
 
 __kernel void FindBestSplit(__global const unsigned short* dataset, __global double* tempVals, __global const unsigned short* splitInfo, 
-			__global double* splitInfoGain) {
+			__global double* splitInfoGain, __global double* read_additional_info) {
 
 	int gid = get_global_id(0);
 	int wid = get_group_id(0);
 	int lid = get_local_id(0);
 	int lsi = get_local_size(0);
 
-	// uses too much memory!!!
-	local unsigned short part1[NUM_DATASETS];
-	local unsigned short part2[NUM_DATASETS];
-	local unsigned short part1_flags[NEXT_SQUARE_OF_TWO];
-	local unsigned short part2_flags[NEXT_SQUARE_OF_TWO];
+	local unsigned char partition[MAX_LOCAL_MEMORY];
+	local unsigned short flags[MAX_LOCAL_MEMORY];
+
+	local unsigned long impurity_buffer_part1[NUM_CATEGORIES];
+	local unsigned long impurity_buffer_part2[NUM_CATEGORIES];
+
+	local unsigned long partition_sizes[2];
+	local unsigned long cur_uncertainty[2]; // work with factor billion
 
 	unsigned short feat = splitInfo[wid*2];
 	unsigned short value = splitInfo[wid*2 + 1];
 
-	int idx = lid;
-	while(idx < NUM_DATASETS) {
-		if(dataset[idx * DS_LEN + feat] < value) {
-			part1[idx] = dataset[idx * DS_LEN + CATEGORY];
-			part2[idx] = (unsigned short) OTHER;
-			part1_flags[idx] = 1;
-			part2_flags[idx] = 0;
-		} else {
-			part1[idx] = (unsigned short) OTHER;
-			part2[idx] = dataset[idx * DS_LEN + CATEGORY];
-			part1_flags[idx] = 0;
-			part2_flags[idx] = 1;
-		}
-
-		idx += lsi;
-	}
-
-	while(idx < NEXT_SQUARE_OF_TWO) {
-		part1_flags[idx] = 0;
-		part2_flags[idx] = 0;
-		idx += lsi;
-	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	// calculate information gain
-	int offset = 1;
-
+	unsigned long processed = 0;
+	int idx;
+	int abs_index;
+	int offset;
 	const int MAX_THREADS_HALF = lsi / 2;
-	int neededThreads = min(NEXT_SQUARE_OF_TWO / 2, MAX_THREADS_HALF);
+	const unsigned long ABS_NUM_VALUES = NUM_DATASETS * DS_LEN;
+	int neededThreads;
+	int part1_size;
+	int part2_size;
+	char ind;
+	char category;
 
-	while(offset <= NEXT_SQUARE_OF_TWO / 2) {
-		if(lid < neededThreads) {
-			idx = lid;
-
-			while(idx < NEXT_SQUARE_OF_TWO - offset) {
-				if(idx % offset == 0) {
-					part1_flags[idx] += part1_flags[idx+offset];
-				}
-				idx += neededThreads;
-			}
-		} 
-		else if(lid < 2 * neededThreads) {
-			idx = lid - neededThreads;
-
-			while(idx < NEXT_SQUARE_OF_TWO - offset) {
-				if(idx % offset == 0) {
-					part2_flags[idx] += part2_flags[idx+offset];
-				} 
-				idx += neededThreads;
-			}
-		}
-
-		offset *= 2;
-		barrier(CLK_LOCAL_MEM_FENCE);
+	if(lid == 0 || lid == 1) {
+		partition_sizes[lid] = 0;
+		cur_uncertainty[lid] = CALC_FACTOR;
 	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	int part1_size = part1_flags[0];
-	int part2_size = part2_flags[0];
-
-	if(part1_size == 0 || part2_size == 0) {
-		if(lid == 0) {
-			splitInfoGain[wid] = 0.0;
-		}
-		return;
-	}
-	
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	local unsigned int impurity_buffer_part1[NUM_CATEGORIES];
-	local unsigned int impurity_buffer_part2[NUM_CATEGORIES];
 
 	neededThreads = min(NUM_CATEGORIES, MAX_THREADS_HALF);
 
@@ -118,49 +68,104 @@ __kernel void FindBestSplit(__global const unsigned short* dataset, __global dou
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	neededThreads = min(NUM_DATASETS, MAX_THREADS_HALF);
-	
-	if(lid < neededThreads) {
+	// take chunks of size of MAX_LOCAL_MEMORY as long until whole NUM_DATASETS was processed
+	while(processed < NUM_DATASETS) {
 		idx = lid;
-		while(idx < NUM_DATASETS) {
-			short category = part1[idx];
-			if(category == OTHER) {
-				idx += neededThreads;
+		while(idx < MAX_LOCAL_MEMORY) {
+			abs_index = (processed + idx) * DS_LEN;
+			if(abs_index + CATEGORY >= ABS_NUM_VALUES) {
+				partition[idx] = OTHER;
+				flags[idx] = 0; //INVALID_FLAG;
+				idx += lsi;
 				continue;
 			}
 
-			atomic_inc(&impurity_buffer_part1[category]);
-			idx += neededThreads;
+			if(dataset[abs_index + feat] < value) {
+				partition[idx] = PARTITION_ONE | dataset[abs_index + CATEGORY];
+				flags[idx] = 1;
+			} else {
+				partition[idx] = PARTITION_TWO | dataset[abs_index + CATEGORY];
+				flags[idx] = 0;
+			}
+
+			idx += lsi;
 		}
-	}
-	else if(lid < neededThreads * 2) {
-		idx = lid - neededThreads;
-		while(idx < NUM_DATASETS) {
-			short category = part2[idx];
-			if(category == OTHER) {
-				idx += neededThreads;
+
+		barrier(CLK_LOCAL_MEM_FENCE);
+
+		offset = 1;
+		while(offset <= MAX_LOCAL_MEMORY / 2) {
+			idx = lid;
+
+			while(idx < MAX_LOCAL_MEMORY - offset) {
+				if(idx % (offset * 2) == 0) {
+					flags[idx] += flags[idx+offset];
+				}
+				idx += lsi;
+			}
+
+			offset *= 2;
+			barrier(CLK_LOCAL_MEM_FENCE);
+		}
+
+		barrier(CLK_LOCAL_MEM_FENCE);
+
+		part1_size = flags[0];
+		part2_size = min((ulong) MAX_LOCAL_MEMORY, (ulong) (NUM_DATASETS - processed)) - part1_size;
+
+		if(lid == 0) {
+			partition_sizes[0] += part1_size;
+			partition_sizes[1] += part2_size;
+		}
+
+		barrier(CLK_LOCAL_MEM_FENCE);
+
+		idx = lid;
+		while(idx < MAX_LOCAL_MEMORY) {
+			category = partition[idx];
+			if((category & CATEGORY_PART) == OTHER) {
+				idx += lsi;
 				continue;
 			}
 
-			atomic_inc(&impurity_buffer_part2[category]);
-			idx += neededThreads;
+			if((category & PARTITION_ONE) == PARTITION_ONE) {
+				ind = category & CATEGORY_PART;
+				atom_inc(&impurity_buffer_part1[ind]);
+			} 
+			else {
+				ind = category & CATEGORY_PART;
+				atom_inc(&impurity_buffer_part2[ind]);
+			}
+			
+			idx += lsi;
 		}
+
+		processed += MAX_LOCAL_MEMORY;
+		barrier(CLK_LOCAL_MEM_FENCE);
 	}
 
-	local unsigned long cur_uncertainty[2]; // work with factor billion
-	if(lid == 0 || lid == 1) {
-		cur_uncertainty[lid] = CALC_FACTOR;
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	if(partition_sizes[0] == 0 || partition_sizes[1] == 0) {
+		if(lid == 0) {
+			splitInfoGain[wid] = 0.0;
+		}
+		return;
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	neededThreads = min(NUM_CATEGORIES, MAX_THREADS_HALF);
 
+	short imp_value;
+	unsigned long reduce;
+
 	if(lid < neededThreads) {
 		idx = lid;
+
 		while(idx < NUM_CATEGORIES) {
-			short value = impurity_buffer_part1[idx];
-			unsigned long reduce = (long) (pow((double) value / (double) part1_size, (double) 2) * CALC_FACTOR);
+			imp_value = impurity_buffer_part1[idx];
+			reduce = (long) (pow((double) imp_value / (double) partition_sizes[0], 2) * CALC_FACTOR);
 			atom_sub(&cur_uncertainty[0], reduce);
 			idx += neededThreads;
 		}
@@ -168,8 +173,8 @@ __kernel void FindBestSplit(__global const unsigned short* dataset, __global dou
 	else if(lid < neededThreads * 2) {
 		idx = lid - neededThreads;
 		while(idx < NUM_CATEGORIES) {
-			short value = impurity_buffer_part2[idx];
-			unsigned long reduce = (long) (pow((double) value / (double) part2_size, (double) 2) * CALC_FACTOR);
+			imp_value = impurity_buffer_part2[idx];
+			unsigned long reduce = (long) (pow((double) imp_value / (double) partition_sizes[1], 2) * CALC_FACTOR);
 			atom_sub(&cur_uncertainty[1], reduce);
 			idx += neededThreads;
 		}
@@ -178,13 +183,13 @@ __kernel void FindBestSplit(__global const unsigned short* dataset, __global dou
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	if(lid == 0) {
-		double p = (double) part1_size / (double) (part1_size + part2_size);
+		double p = (double) partition_sizes[0] / (double) (partition_sizes[0] + partition_sizes[1]);
 		double curUncertaintyPart1 = (double) cur_uncertainty[0] / (double) CALC_FACTOR;
 		double curUncertaintyPart2 = (double) cur_uncertainty[1] / (double) CALC_FACTOR; 
 
 		double infoGain = ((double) tempVals[2] - p * curUncertaintyPart1 - (double) (1 - p) * curUncertaintyPart2); // tempVals[2] = currentUncertainty
 
-		splitInfoGain[wid] = infoGain;
+		splitInfoGain[wid] = (float) infoGain;
 
 		// think of a way to determine the highest info gain on the gpu
 	}

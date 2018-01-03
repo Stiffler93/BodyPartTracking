@@ -11,6 +11,7 @@ namespace tree {
 	const static int BPT_NUM_FEATURES = 10;
 	const static bool BPT_TRACE = true;
 	const static int BPT_NUM_DATASETS = 665840;
+	const static short BPT_STOP_EVALUATION_LIMIT = 50;
 	const static string BPT_FOLDER_ROOT = "C:\\Users\\Stefan\\Desktop\\Master\\Masterarbeit\\Programme\\BodyPartTracking\\";
 	const static string BPT_FOLDER_DATA = "Data\\";
 	const static string BPT_FOLDER_TRAINING = "TrainingImages\\StraightPostures\\";
