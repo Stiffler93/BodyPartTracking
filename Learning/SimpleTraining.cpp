@@ -28,7 +28,6 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 			Result res;
 			res.outcome = trData[0].outcome;
 			res.probability = 1.0;
-			//std::printf("--> ResultNode(%s,%lf).\n", res.outcome.c_str(), res.probability);
 			decNode = (Node*) new ResultNode(res);
 		}
 		else {
@@ -59,7 +58,6 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 				endRes.push_back(r);
 			}
 
-			//std::printf("--> ResultNode(%s,%lf).\n", endRes[0].outcome.c_str(), endRes[0].probability);
 			decNode = (Node*) new ResultNode(endRes);
 		}
 
@@ -71,7 +69,6 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 		return;
 	}
 
-	//std::printf("--> DecisionNode(%d,%d).\n", split.decision.feature, split.decision.refVal);
 	decNode = (Node*) new DecisionNode(split.decision);
 
 	Partition part;
@@ -80,23 +77,7 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 
 	partition(&part, trData, numTrData, split.decision);
 
-	//std::printf("True-Branch Split: \n");
-	//for (int i = 0; i < part.true_branch_size; i++) {
-	//	std::printf("\t%d.: >%s<\n", i, part.true_branch[i].toString().c_str());
-	//}
-
-	//std::printf("False-Branch Split: \n");
-	//for (int i = 0; i < part.false_branch_size; i++) {
-	//	std::printf("\t%d.: >%s<\n", i, part.false_branch[i].toString().c_str());
-	//}
-
-	//std::printf("\n");
-
 	delete[] trData;
-
-	//clock_t end = clock();
-	//double elapsed_secs = double(end - begin) / (double)CLOCKS_PER_SEC;
-	//printf("Cycle took %lf seconds!\n", elapsed_secs);
 
 	if (part.true_branch_size > 0)
 		buildTree(decNode->true_branch, part.true_branch, part.true_branch_size, numTrDataLeft);

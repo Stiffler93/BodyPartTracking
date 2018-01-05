@@ -1,4 +1,5 @@
 #include "CPUTrainingInterface.h"
+#include "TreeUtils.h"
 
 bool isPure(Dataset* trData, int numTrData) {
 	string ref = trData[0].outcome;
@@ -121,8 +122,8 @@ BestSplit findBestSplit(Dataset* trData, int numTrData) {
 
 			partition(&part, trData, numTrData, dec);
 
-			if (part.false_branch_size == 0 || part.true_branch_size == 0)
-				continue;
+			//if (part.false_branch_size == 0 || part.true_branch_size == 0)
+			//	continue;
 
 			float gain = infoGain(part, current_uncertainty);
 			const int FACTOR = 1000000;

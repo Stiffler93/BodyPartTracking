@@ -1,11 +1,16 @@
 #include "ParallelTraining.h"
 #include <sstream>
 #include <ctime>
+#include "TreeUtils.h"
+#include <omp.h>
 
 #define SUCCESS 0
 #define FAILURE 1
 
-#define NUM_UNIQUE_VALS (NORM_FACTOR + 1) * BPT_NUM_FEATURES;
+#define KERNEL_CALC_IMPURITY_1 0
+#define KERNEL_CALC_IMPURITY_2 1
+#define KERNEL_CALC_UNIQUE_VALS 2
+#define KERNEL_FIND_BEST_SPLIT 3
 
 void checkError(int error, std::string message);
 
@@ -23,12 +28,13 @@ cl::Kernel* kernel(cl::Context context, cl::Device device, string file, std::map
 	}
 
 	readKernel.close();
-
+	
 	cl::Program::Sources sources;
 	std::string kernel_code = ss.str();
 
 	sources.push_back({ kernel_code.c_str(),kernel_code.length() });
 	cl::Program program(context, sources);
+
 	cl_int err;
 	if ((err = program.build({ device })) != CL_SUCCESS) {
 		std::cout << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << std::endl;
@@ -39,12 +45,12 @@ cl::Kernel* kernel(cl::Context context, cl::Device device, string file, std::map
 
 	std::string kernelName;
 	size_t start = file.find_last_of('/');
-	size_t end = file.find_last_of('.');
+	size_t endf = file.find_last_of('.');
 
 	if (start == std::string::npos)
 		start = 0;
 
-	kernelName = file.substr(start, end - start);
+	kernelName = file.substr(start, endf - start);
 
 	cl::Kernel* k = new cl::Kernel(program, kernelName.c_str(), &err);
 	checkError(err, "Kernel creation failed!");
@@ -52,17 +58,16 @@ cl::Kernel* kernel(cl::Context context, cl::Device device, string file, std::map
 	return k;
 }
 
-void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& context, cl::Device& device, cl::CommandQueue& queue, unsigned long* numTrDataLeft) {
-	//clock_t begin = clock();
-	//printf("Call trainingsLoop(). numTrData = %d\n", numTrData);
-
+void trainingsLoop(Dataset * trData, const unsigned int numTrData, Node *& node, cl::Context& context, cl::Device& device, cl::CommandQueue& queue, unsigned long* numTrDataLeft, /*std::vector<cl::Kernel>& kernels*/ cl::Kernel* kernels) {
+	//std::printf("Call trainingsLoop(). numTrData = %d\n", numTrData);
+	
 	BestSplit split;
 	double impurity = 1;
 
-	if (numTrData < 2200 && numTrData > BPT_STOP_EVALUATION_LIMIT) { // CPU (is faster for small data
+	if (false && numTrData < 1550 && numTrData > BPT_STOP_EVALUATION_LIMIT) { // CPU (is faster for small data
 		bool isHeterogenous = false;
 		string temp = trData[0].outcome;
-		for (int i = 1; i <= numTrData; i++) {
+		for (unsigned int i = 1; i <= numTrData; i++) {
 			if (temp != trData[i - 1].outcome) {
 				isHeterogenous = true;
 				break;
@@ -95,7 +100,7 @@ void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& c
 		checkError(err, "temp_values could not be created");
 
 		Dataset set;
-		for (int i = 0, offset = 0; i < numTrData; i++, offset += datasetLength) {
+		for (unsigned int i = 0, offset = 0; i < numTrData; i++, offset += datasetLength) {
 			set = trData[i];
 			unsigned short* arr = set.toArray();
 			memcpy(dataset + offset, arr, datasetLength * sizeof(unsigned short));
@@ -115,42 +120,43 @@ void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& c
 
 		delete[] imp_buffer;
 
-		cl::Kernel* kernel_calc_impurity = kernel(context, device, "CalcImpurity.cl");
-		kernel_calc_impurity->setArg(0, *dataset_buffer);
-		kernel_calc_impurity->setArg(1, *impurity_buffer);
-		kernel_calc_impurity->setArg(2, numTrData);
+		cl::Kernel kernel_calc_impurity = kernels[KERNEL_CALC_IMPURITY_1];
+		kernel_calc_impurity.setArg(0, *dataset_buffer);
+		kernel_calc_impurity.setArg(1, *impurity_buffer);
+		kernel_calc_impurity.setArg(2, numTrData);
 
 		int tenthOfNumTrData = (int)ceil((double)numTrData / (double)NUM_COMPUTE_UNITS);
 		int work_item_per_group = std::min(256, tenthOfNumTrData);
 		int multiplicator = (int)ceil((double)numTrData / (double)work_item_per_group);
-		err = queue.enqueueNDRangeKernel(*kernel_calc_impurity, cl::NullRange, cl::NDRange(work_item_per_group * multiplicator), cl::NDRange(work_item_per_group));
+		err = queue.enqueueNDRangeKernel(kernel_calc_impurity, cl::NullRange, cl::NDRange(work_item_per_group * multiplicator), cl::NDRange(work_item_per_group));
 		checkError(err, "enqueueing kernel_calc_impurity failed.");
 
-		delete kernel_calc_impurity;
+		queue.finish();
 
-		cl::Kernel* kernel_calc_impurity2 = kernel(context, device, "CalcImpurity2.cl");
-		kernel_calc_impurity2->setArg(0, *impurity_buffer);
-		kernel_calc_impurity2->setArg(1, *temp_values_buffer);
-		kernel_calc_impurity2->setArg(2, numTrData);
+		cl::Kernel kernel_calc_impurity2 = kernels[KERNEL_CALC_IMPURITY_2];
+		kernel_calc_impurity2.setArg(0, *impurity_buffer);
+		kernel_calc_impurity2.setArg(1, *temp_values_buffer);
+		kernel_calc_impurity2.setArg(2, numTrData);
 
-		err = queue.enqueueNDRangeKernel(*kernel_calc_impurity2, cl::NullRange, cl::NDRange(NUM_CATEGORIES), cl::NDRange(NUM_CATEGORIES));
+		err = queue.enqueueNDRangeKernel(kernel_calc_impurity2, cl::NullRange, cl::NDRange(NUM_CATEGORIES), cl::NDRange(NUM_CATEGORIES));
 		checkError(err, "enqueueing kernel_calc_impurity2 failed.");
 
-		delete kernel_calc_impurity2;
+		queue.finish();
 
 		err = queue.enqueueReadBuffer(*temp_values_buffer, CL_TRUE, 2 * sizeof(double), sizeof(double), &impurity);
+		checkError(err, "reading temp_values_buffer impurity failed!");
 
 		if (impurity < 0 || impurity > 1) {
-			printf("Impurity >%lf< is wrong! Exit program!\n", impurity);
+			std::printf("Impurity >%lf< is wrong! Exit program!\n", impurity);
 		}
 
 		if (impurity != 0) {
 			cl::Buffer* unique_vals_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(unsigned char) * NUM_VALS_PER_FEATURE * numFeatures(), NULL, &err);
 			checkError(err, "unique_vals_buffer could not be created");
 
-			cl::Kernel* kernel_calc_unique_vals = kernel(context, device, "CalcUniqueVals.cl");
-			kernel_calc_unique_vals->setArg(0, *dataset_buffer);
-			kernel_calc_unique_vals->setArg(1, *unique_vals_buffer);
+			cl::Kernel kernel_calc_unique_vals = kernels[KERNEL_CALC_UNIQUE_VALS];
+			kernel_calc_unique_vals.setArg(0, *dataset_buffer);
+			kernel_calc_unique_vals.setArg(1, *unique_vals_buffer);
 
 			unsigned char* empty_buffer = new unsigned char[NUM_VALS_PER_FEATURE * numFeatures()];
 			for (int i = 0; i < NUM_VALS_PER_FEATURE * numFeatures(); i++) {
@@ -159,10 +165,10 @@ void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& c
 			err = queue.enqueueWriteBuffer(*unique_vals_buffer, CL_TRUE, 0, sizeof(unsigned char) * NUM_VALS_PER_FEATURE * numFeatures(), empty_buffer);
 			delete[] empty_buffer;
 
-			err = queue.enqueueNDRangeKernel(*kernel_calc_unique_vals, cl::NullRange, cl::NDRange(datasetValues));
+			err = queue.enqueueNDRangeKernel(kernel_calc_unique_vals, cl::NullRange, cl::NDRange(datasetValues));
 			checkError(err, "enqueueing kernel_calc_unique_vals failed.");
 
-			delete kernel_calc_unique_vals;
+			queue.finish();
 
 			unsigned char* uniqueVals = new unsigned char[numFeatures() * NUM_VALS_PER_FEATURE];
 			err = queue.enqueueReadBuffer(*unique_vals_buffer, CL_TRUE, 0, sizeof(unsigned char) * NUM_VALS_PER_FEATURE * numFeatures(), uniqueVals);
@@ -199,45 +205,55 @@ void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& c
 			cl::Buffer* split_info_gain_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(double) * numUniqueVals, NULL, &err);
 			checkError(err, "split_info_gain_buffer could not be created");
 
-			cl::Buffer* read_additional_info_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(double) * 88, NULL, &err);
-			checkError(err, "read_additional_info_buffer could not be created");
+			//cl::Buffer* read_additional_info_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(double) * numUniqueVals * 22, NULL, &err);
+			//checkError(err, "read_additional_info_buffer could not be created");
 
-			std::map<string, string> macros;
-			macros.insert(std::pair<string, string>("NUM_DATASETS", to_string(numTrData)));
-			//macros.insert(std::pair<string, string>("NEXT_SQUARE_OF_TWO", to_string(nextSquareOfTwo)));
+			cl::Kernel kernel_best_split = kernels[KERNEL_FIND_BEST_SPLIT];
+			kernel_best_split.setArg(0, *dataset_buffer);
+			kernel_best_split.setArg(1, *temp_values_buffer);
+			kernel_best_split.setArg(2, *split_info_buffer);
+			kernel_best_split.setArg(3, *split_info_gain_buffer);
+			kernel_best_split.setArg(4, numTrData);
+			//kernel_best_split.setArg(5, *read_additional_info_buffer);
 
-			cl::Kernel* kernel_best_split = kernel(context, device, "FindBestSplit.cl", macros);
-			kernel_best_split->setArg(0, *dataset_buffer);
-			kernel_best_split->setArg(1, *temp_values_buffer);
-			kernel_best_split->setArg(2, *split_info_buffer);
-			kernel_best_split->setArg(3, *split_info_gain_buffer);
-			kernel_best_split->setArg(4, *read_additional_info_buffer);
+			work_item_per_group = std::min((unsigned int) 256, numTrData * 2);
 
-			work_item_per_group = std::min(256, numTrData * 2);
-
-			err = queue.enqueueNDRangeKernel(*kernel_best_split, cl::NullRange, cl::NDRange(numUniqueVals * work_item_per_group), cl::NDRange(work_item_per_group));
+			err = queue.enqueueNDRangeKernel(kernel_best_split, cl::NullRange, cl::NDRange(numUniqueVals * work_item_per_group), cl::NDRange(work_item_per_group));
 			checkError(err, "enqueueing kernel_partition_data failed.");
 
-			delete kernel_best_split;
+			queue.finish();
+
 			delete split_info_buffer;
+
+			//double* read_additional_info = new double[numUniqueVals * 22];
+			//err = queue.enqueueReadBuffer(*read_additional_info_buffer, CL_TRUE, 0, sizeof(double) * numUniqueVals * 22, read_additional_info);
+			//checkError(err, "read_additional_info_buffer could not be read");
+
+			//for (int i = 0; i < numUniqueVals; i++) {
+			//	trace("Group-ID = " + to_string(i));
+			//	for (int j = 0; j < 22; j++) {
+			//		trace("Val(" + to_string(j) + ") = " + to_string(read_additional_info[i * 22 + j]));
+			//	}
+			//}
 
 			double* read_split_info_gain = new double[numUniqueVals];
 			err = queue.enqueueReadBuffer(*split_info_gain_buffer, CL_TRUE, 0, sizeof(double) * numUniqueVals, read_split_info_gain);
 			checkError(err, "split_info_gain_buffer could not be read.");
 
-			double read_additional_info[88];
-			err = queue.enqueueReadBuffer(*read_additional_info_buffer, CL_TRUE, 0, sizeof(double) * 88, read_additional_info);
-			checkError(err, "read_additional_info could not be read.");
-
 			delete split_info_gain_buffer;
 
 			const int FACTOR = 1000000;
+			//trace("Current Uncertainty = " + to_string(impurity));
+			//trace("Num Unique Vals = " + to_string(numUniqueVals));
 			for (int i = 0; i < numUniqueVals; i++) {
 				int newGain = (int)(read_split_info_gain[i] * FACTOR);
 				int oldGain = (int)(split.gain * FACTOR);
 				if (read_split_info_gain[i] < -0.0001 || read_split_info_gain[i] > 1) {
-					printf("Index = %d, Split Info Gain = %lf < 0 || > 1 !!!\n", i, read_split_info_gain[i]);
+					std::printf("Index = %d, Split Info Gain = %lf < 0 || > 1 !!!\n", i, read_split_info_gain[i]);
 				}
+
+				//trace("Feature = " + to_string(splitInfo[i * 2]) + ", Val = " + to_string(splitInfo[i * 2 + 1]) + "> " + to_string(newGain) + " > " + to_string(oldGain));
+
 				if (/*(float) read_split_info_gain[i] > (float) split.gain*/ newGain > oldGain) {
 					split.gain = (float)read_split_info_gain[i];
 					split.decision.feature = splitInfo[i * 2];
@@ -248,7 +264,7 @@ void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& c
 			delete[] read_split_info_gain;
 			delete[] splitInfo;
 
-			//printf("Best Info Gain = %lf for Feature %d with Value %d\n", split.gain, split.decision.feature, split.decision.refVal);
+			//std::printf("Best Info Gain = %lf for Feature %d with Value %d\n", split.gain, split.decision.feature, split.decision.refVal);
 		}
 
 		delete impurity_buffer;
@@ -265,7 +281,7 @@ void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& c
 		}
 		else {
 			map<string, int> results;
-			for (int i = 0; i < numTrData; i++) {
+			for (unsigned int i = 0; i < numTrData; i++) {
 				string category = trData[i].outcome;
 				map<string, int>::iterator val = results.lower_bound(category);
 
@@ -297,7 +313,7 @@ void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& c
 		delete[] trData;
 
 		*numTrDataLeft = *numTrDataLeft - numTrData;
-		printf("NumTrDataLeft: %ld\n", *numTrDataLeft);
+		std::printf("NumTrDataLeft: %ld\n", *numTrDataLeft);
 
 		return;
 	}
@@ -309,29 +325,27 @@ void trainingsLoop(Dataset * trData, int numTrData, Node *& node, cl::Context& c
 	part.false_branch = new Dataset[numTrData];
 
 	if (part.true_branch_size == numTrData || part.false_branch_size == numTrData) {
-		printf("ERROR when partitioning Dataset! Set wasn't reduced!\n");
+		std::printf("ERROR when partitioning Dataset! Set wasn't reduced!\n");
 	}
 
 	partition(&part, trData, numTrData, split.decision);
 
 	delete[] trData;
 
-	//clock_t end = clock();
-	//double elapsed_secs = double(end - begin) / (double)CLOCKS_PER_SEC;
-	//printf("Cycle took %lf seconds!\n", elapsed_secs);
-
 	if (part.true_branch_size > 0)
-		trainingsLoop(part.true_branch, part.true_branch_size, node->true_branch, context, device, queue, numTrDataLeft);
+		trainingsLoop(part.true_branch, part.true_branch_size, node->true_branch, context, device, queue, numTrDataLeft, kernels);
 
 	if (part.false_branch_size > 0)
-		trainingsLoop(part.false_branch, part.false_branch_size, node->false_branch, context, device, queue, numTrDataLeft);
+		trainingsLoop(part.false_branch, part.false_branch_size, node->false_branch, context, device, queue, numTrDataLeft, kernels);
 }
 
-void startParallelTraining(Dataset * trData, int numTrData, Node *& rootNode)
+void startParallelTraining(Dataset * trData, const unsigned int numTrData, Node *& rootNode)
 {
+	std::printf("Start Parallel Training.\n");
 	std::string s;
 	std::vector<cl::Platform> all_platforms;
 	cl::Platform::get(&all_platforms);
+
 	if (all_platforms.size() == 0) {
 		std::cout << " No platforms found. Check OpenCL installation!\n";
 		exit(1);
@@ -341,7 +355,7 @@ void startParallelTraining(Dataset * trData, int numTrData, Node *& rootNode)
 
 	for (cl::Platform platform : all_platforms) {
 		cl::string name = platform.getInfo<CL_PLATFORM_NAME>(&err);
-		printf("Platform: %s\n", name.c_str());
+		std::printf("Platform: %s\n", name.c_str());
 	}
 
 	cl::Platform default_platform = all_platforms[0];
@@ -368,17 +382,49 @@ void startParallelTraining(Dataset * trData, int numTrData, Node *& rootNode)
 	cl::CommandQueue queue(context, default_device, NULL, &err);
 	checkError(err, "CommandQueue creation failed!");
 
-	unsigned long numTrDataLeft = BPT_NUM_DATASETS;
-	printf("NumTrDataLeft: %ld\n", numTrDataLeft);
+	cl::Kernel kernels[4];
 
-	trainingsLoop(trData, numTrData, rootNode, context, default_device, queue, &numTrDataLeft);
+#pragma omp parallel num_threads(4) 
+{
+	int id = omp_get_thread_num();
+	cl::Kernel* k = NULL;
+
+	switch (id) {
+	case 0:
+		k = kernel(context, default_device, "CalcImpurity.cl");
+		break;
+	case 1:
+		k = kernel(context, default_device, "CalcImpurity2.cl");
+		break;
+	case 2:
+		k = kernel(context, default_device, "CalcUniqueVals.cl");
+		break;
+	case 3:
+		k = kernel(context, default_device, "FindBestSplit.cl");
+		break;
+	}
+
+	kernels[id] = *k;
+	delete k;
+}
+
+	std::printf("Kernels created... Start training!\n\n");
+
+	unsigned long numTrDataLeft = BPT_NUM_DATASETS;
+	std::printf("NumTrDataLeft: %ld\n", numTrDataLeft);
+
+	clock_t b = clock();
+	trainingsLoop(trData, numTrData, rootNode, context, default_device, queue, &numTrDataLeft, kernels);
+	clock_t e = clock();
+	double time = double(e - b) / (double)CLOCKS_PER_SEC;
+	printf("Parallel Training took %lf seconds.\n", time);
 
 	std::cout << "Finished." << std::endl;
 }
 
 void checkError(int error, std::string message) {
 	if (error != 0) {
-		printf("%s. ErrorCode = %d\n", message.c_str(), error);
+		std::printf("%s. ErrorCode = %d\n", message.c_str(), error);
 		std::string s;
 		std::cin >> s;
 		exit(1);

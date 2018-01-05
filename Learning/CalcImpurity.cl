@@ -5,7 +5,7 @@
 #define CALC_FACTOR 10000000000
 
 __kernel void CalcImpurity(__global const unsigned short* dataset, __global unsigned int* impurity_buffer, const unsigned int NUM_DATASETS) {
-	int gid = get_global_id(0);
+	unsigned int gid = get_global_id(0);
 	int lid = get_local_id(0);
 	int lsi = get_local_size(0);
 	int wid = get_group_id(0);

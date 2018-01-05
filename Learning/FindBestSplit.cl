@@ -13,7 +13,7 @@
 #define CATEGORY_PART 0x0F
 
 __kernel void FindBestSplit(__global const unsigned short* dataset, __global double* tempVals, __global const unsigned short* splitInfo, 
-			__global double* splitInfoGain, __global double* read_additional_info) {
+			__global double* splitInfoGain, const unsigned int NUM_DATASETS/*, __global double* additionalInfo*/) {
 
 	int gid = get_global_id(0);
 	int wid = get_group_id(0);
@@ -33,16 +33,16 @@ __kernel void FindBestSplit(__global const unsigned short* dataset, __global dou
 	unsigned short value = splitInfo[wid*2 + 1];
 
 	unsigned long processed = 0;
-	int idx;
-	int abs_index;
-	int offset;
+	int idx = 0;
+	int abs_index = 0;
+	int offset = 0;
 	const int MAX_THREADS_HALF = lsi / 2;
 	const unsigned long ABS_NUM_VALUES = NUM_DATASETS * DS_LEN;
-	int neededThreads;
-	int part1_size;
-	int part2_size;
-	char ind;
-	char category;
+	int neededThreads = 0;
+	int part1_size = 0;
+	int part2_size = 0;
+	char ind = 0;
+	char category = 0;
 
 	if(lid == 0 || lid == 1) {
 		partition_sizes[lid] = 0;
@@ -157,15 +157,16 @@ __kernel void FindBestSplit(__global const unsigned short* dataset, __global dou
 
 	neededThreads = min(NUM_CATEGORIES, MAX_THREADS_HALF);
 
-	short imp_value;
-	unsigned long reduce;
+	unsigned long imp_value = 0;
+	unsigned long reduce = 0;
 
 	if(lid < neededThreads) {
 		idx = lid;
 
 		while(idx < NUM_CATEGORIES) {
 			imp_value = impurity_buffer_part1[idx];
-			reduce = (long) (pow((double) imp_value / (double) partition_sizes[0], 2) * CALC_FACTOR);
+			reduce = (long) (pow((double) imp_value / (double) partition_sizes[0], (double) 2) * CALC_FACTOR);
+			//additionalInfo[wid*22 + 2 + idx] = reduce;
 			atom_sub(&cur_uncertainty[0], reduce);
 			idx += neededThreads;
 		}
@@ -174,7 +175,8 @@ __kernel void FindBestSplit(__global const unsigned short* dataset, __global dou
 		idx = lid - neededThreads;
 		while(idx < NUM_CATEGORIES) {
 			imp_value = impurity_buffer_part2[idx];
-			unsigned long reduce = (long) (pow((double) imp_value / (double) partition_sizes[1], 2) * CALC_FACTOR);
+			unsigned long reduce = (long) (pow((double) imp_value / (double) partition_sizes[1], (double) 2) * CALC_FACTOR);
+			//additionalInfo[wid*22 + 3 + idx + NUM_CATEGORIES] = reduce;
 			atom_sub(&cur_uncertainty[1], reduce);
 			idx += neededThreads;
 		}
@@ -190,6 +192,43 @@ __kernel void FindBestSplit(__global const unsigned short* dataset, __global dou
 		double infoGain = ((double) tempVals[2] - p * curUncertaintyPart1 - (double) (1 - p) * curUncertaintyPart2); // tempVals[2] = currentUncertainty
 
 		splitInfoGain[wid] = (float) infoGain;
+
+		/*
+		additionalInfo[wid*22 + 0] = wid;
+		additionalInfo[wid*22 + 1] = -999999;
+		additionalInfo[wid*22 + 8] = -999999;
+		additionalInfo[wid*22 + 15] = -999999;
+		additionalInfo[wid*22 + 16] = curUncertaintyPart1;
+		additionalInfo[wid*22 + 17] = curUncertaintyPart2;
+		additionalInfo[wid*22 + 18] = infoGain;
+		*
+
+		additionalInfo[wid*22 + 0] = wid;
+		additionalInfo[wid*22 + 1] = partition_sizes[0];
+		additionalInfo[wid*22 + 2] = partition_sizes[1];
+		additionalInfo[wid*22 + 3] = -999999;
+		additionalInfo[wid*22 + 4] = p;
+		additionalInfo[wid*22 + 5] = curUncertaintyPart1;
+		additionalInfo[wid*22 + 6] = curUncertaintyPart2;
+		additionalInfo[wid*22 + 7] = infoGain;
+		additionalInfo[wid*22 + 8] = -999999;
+		additionalInfo[wid*22 + 9] = impurity_buffer_part1[0];
+		additionalInfo[wid*22 + 10] = impurity_buffer_part1[1];
+		additionalInfo[wid*22 + 11] = impurity_buffer_part1[2];
+		additionalInfo[wid*22 + 12] = impurity_buffer_part1[3];
+		additionalInfo[wid*22 + 13] = impurity_buffer_part1[4];
+		additionalInfo[wid*22 + 14] = impurity_buffer_part1[5];
+		additionalInfo[wid*22 + 15] = -999999;
+		additionalInfo[wid*22 + 16] = impurity_buffer_part2[0];
+		additionalInfo[wid*22 + 17] = impurity_buffer_part2[1];
+		additionalInfo[wid*22 + 18] = impurity_buffer_part2[2];
+		additionalInfo[wid*22 + 19] = impurity_buffer_part2[3];
+		additionalInfo[wid*22 + 20] = impurity_buffer_part2[4];
+		additionalInfo[wid*22 + 21] = impurity_buffer_part2[5];
+
+		*/
+
+		//printf("Group-ID = %d, p = %lf, curUncertaintyPart1 = %lf, curUncertaintyPart2 = %lf, infoGain = %lf.\n", wid, p, curUncertaintyPart1, curUncertaintyPart2, infoGain);
 
 		// think of a way to determine the highest info gain on the gpu
 	}

@@ -1,4 +1,3 @@
-//#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
 #pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 
 #define DS_LEN 11
@@ -19,11 +18,11 @@ __kernel void CalcImpurity2(__global unsigned int* impurity_buffer, __global dou
 
 	short idx = lid;
 	while(idx < NUM_CATEGORIES) {
-		short value = impurity_buffer[idx];
+		unsigned int value = impurity_buffer[idx];
 		unsigned long reduce = (long) (pow((double) value / (double) NUM_DATASETS, (double) 2) * CALC_FACTOR);
-		//printf("Reduce uncertainty IDX = %d> Value = %d, reduce = %ld\n", idx, value, reduce);
 		atom_sub(&cur_uncertainty[0], reduce);
 		idx += lsi;
+		//printf("Reduce uncertainty IDX = %d> Value = %d, reduce = %ld\n", idx, value, reduce);
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);

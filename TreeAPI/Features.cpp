@@ -16,12 +16,9 @@ void getSubject(Mat& depImg, Mat& depImgSubject) {
 
 	Mat labels, stats, centroids, temp;
 	int nLabels = connectedComponentsWithStats(mask, labels, stats, centroids);
-	//printf("nLabels: %d\n", nLabels);
 	if (nLabels > 1) {
 		int biggestLabel = 0, biggestLabelSize = 0;
 		for (int i = 1; i <= nLabels; i++) {
-			/*temp = 0;
-			temp.setTo(1, labels == i);*/
 			int count = countNonZero(labels == i);
 			if (count > biggestLabelSize) {
 				biggestLabelSize = count;
@@ -29,7 +26,6 @@ void getSubject(Mat& depImg, Mat& depImgSubject) {
 			}
 		}
 
-		//printf("Biggest Component is %d\n", biggestLabel);
 		mask.setTo(0, labels != biggestLabel);
 	}
 
@@ -37,6 +33,8 @@ void getSubject(Mat& depImg, Mat& depImgSubject) {
 
 	double minVal, maxVal;
 	minMaxIdx(depImgSubject, &minVal, &maxVal, NULL, NULL, mask != 0);
+
+	// normalize depth values
 
 	short min = (short)minVal;
 	short max = (short)maxVal;

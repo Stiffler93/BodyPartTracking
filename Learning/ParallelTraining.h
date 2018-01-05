@@ -6,4 +6,4 @@
 
 using namespace tree;
 
-void startParallelTraining(Dataset* trData, int numTrData, Node*& rootNode);
+void startParallelTraining(Dataset* trData, const unsigned int numTrData, Node*& rootNode);

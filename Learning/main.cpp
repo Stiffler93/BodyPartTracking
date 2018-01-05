@@ -15,15 +15,6 @@ void readTrainingData(string inputfile, Dataset* trData, int* numTrData);
 
 void test(Dataset test, Node* decisionTree);
 
-
-int main_par(int argc, char** argv) {
-	// test main for ParallelTraining
-	Node* n;
-	startParallelTraining(NULL, 0, n);
-
-	return 0;
-}
-
 int main(int argc, char** argv) 
 {
 	printf("Start.\n");
@@ -62,8 +53,8 @@ int main(int argc, char** argv)
 	clock_t begin = clock();
 
 	Node* decisionTree = NULL;
-	//startSimpleTraining(trData, numTrData, decisionTree);
-	startParallelTraining(trData, numTrData, decisionTree);
+	startSimpleTraining(trData, numTrData, decisionTree);
+	//startParallelTraining(trData, numTrData, decisionTree);
 
 	clock_t end = clock();
 	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
@@ -144,7 +135,7 @@ void readTrainingData(string inputfile, Dataset* trData, int* numTrData)
 	int category;
 
 	ifstream trDataset(inputfile);
-	while (trDataset >> feat) {
+	while (*numTrData < numDatasets() && trDataset >> feat) {
 		trData[*numTrData].feature[0] = feat;
 		for (int i = 1; i < numFeatures(); i++) {
 			trDataset >> feat;
