@@ -2,12 +2,8 @@
 #include "OpenNI.h"
 #include "opencv2\opencv.hpp"
 #include "DecTree.h"
-#include <string>
-#include <sstream>
-
-using namespace openni;
-using namespace cv;
-using namespace std;
+#include "DecisionForest.h"
+#include "BodyPartDetector.h"
 
 typedef int Stream;
 
@@ -22,33 +18,34 @@ namespace util {
 	class ImageRecorder
 	{
 	public:
-		ImageRecorder(Device& device, VideoStream** streams, tree::Node* decisionTree, function<void(Mat& img, Mat& classifiedImg, 
-			tree::Dataset**& featureMatrix, tree::Node* decTree)> classification);
+		ImageRecorder(openni::Device& device, openni::VideoStream** streams, tree::DecisionForest& decForest, std::function<void(cv::Mat& img, cv::Mat& classifiedImg,
+			tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector)> classification);
 		~ImageRecorder();
 
 		void run();
 
 	private:
-		Device& device;
-		VideoStream** streams;
-		VideoFrameRef depthFrame;
-		Mat depthMat;
-		Mat classifiedMat;
+		openni::Device& device;
+		openni::VideoStream** streams;
+		openni::VideoFrameRef depthFrame;
+		cv::Mat depthMat;
+		cv::Mat classifiedMat;
 		tree::Dataset** featureMatrix;
-		tree::Node* decTree;
+		tree::DecisionForest& decForest;
+		tree::BodyPartDetector bpDetector;
 
 		int counter = 0;
 		int numImage = 1;
 
 		int img = 1;
 
-		function<void(Mat& img, Mat& classifiedMat, tree::Dataset**& featureMatrix, tree::Node* decTree)> classification;
+		std::function<void(cv::Mat& img, cv::Mat& classifiedMat, tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector)> classification;
 
 		void createWindows();
 		void initCV();
 		void readStreams();
-		void readFrame(VideoStream& stream, VideoFrameRef& frame);
-		void processImage(Mat& img, Stream stream, const char* window);
+		void readFrame(openni::VideoStream& stream, openni::VideoFrameRef& frame);
+		void processImage(cv::Mat& img, Stream stream, const char* window);
 	};
 }
 

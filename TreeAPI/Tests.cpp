@@ -1,18 +1,21 @@
 #include "Tests.h"
 #include "CategoryUtils.h"
+#include "TreeUtils.h"
+#include <fstream>
 
 using namespace tree;
+using std::string;
 
 void testWithTrainingData(tree::Node * decisionTree)
 {
 	printf("Start Test with own Training Data: \n");
 	string dataset = datasetFile();
-	ifstream features(dataset);
+	std::ifstream features(dataset);
 
 	int feat1, feat2, feat3, feat4, feat5, feat6, feat7, feat8, feat9, feat10;
 	int category;
 	int total = 0, correctClass = 0, falseClass = 0;
-	vector<Result> results;
+	std::vector<Result> results;
 
 	while (features >> feat1 >> feat2 >> feat3 >> feat4 >> feat5 >> feat6 >> feat7 >> feat8 >> feat9 >> feat10 >> category) {
 		Dataset set;
@@ -69,8 +72,39 @@ void testWithTrainingData(tree::Node * decisionTree)
 		}
 	}
 
-	printf("\n\nTest finished.\n");
-	printf("Tested a total of %d Datasets.\n", total);
-	printf("Correct: >%d<, False: >%d<\n", correctClass, falseClass);
-	printf("Correctly classified %lf percent.\n", (float)correctClass / (float)total * 100);
+	std::printf("\n\nTest finished.\n");
+	std::printf("Tested a total of %d Datasets.\n", total);
+	std::printf("Correct: >%d<, False: >%d<\n", correctClass, falseClass);
+	std::printf("Correctly classified %lf percent.\n", (float)correctClass / (float)total * 100);
+}
+
+void testWithTestData(tree::Node * decisionTree, tree::Dataset * testData, int numTestData)
+{
+	int correctClass = 0, falseClass = 0;
+
+	for (int i = 0; i < numTestData; i++) {
+		Dataset set = testData[i];
+		std::vector<Result> results;
+		findResult(decisionTree, set, results);
+
+		bool found = false;
+		for (Result r : results) {
+			if (r.outcome == set.outcome) {
+				found = true;
+				break;
+			}
+		}
+
+		if (found) {
+			correctClass++;
+		}
+		else {
+			falseClass++;
+		}
+	}
+
+	std::printf("\n\nTest finished.\n");
+	std::printf("Tested a total of %d Datasets.\n", numTestData);
+	std::printf("Correct: >%d<, False: >%d<\n", correctClass, falseClass);
+	std::printf("Correctly classified %lf percent.\n", (float)correctClass / (float)numTestData * 100);
 }

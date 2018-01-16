@@ -1,6 +1,6 @@
 #include "TreeSettings.h"
 
-using namespace tree;
+using std::string;
 
 bool tree::isTraceActive() {
 	return BPT_TRACE;
@@ -38,8 +38,27 @@ string tree::datasetFile() {
 	return dataFolder() + BPT_FILE_DATASET;
 }
 
+std::string tree::strainsFile()
+{
+	return dataFolder() + BPT_FILE_STRAINS;
+}
+
 string tree::classifiedImagesFolder() {
 	return trainingFolder() + BPT_FOLDER_CLASSIFIED_IMAGES;
+}
+
+std::string tree::measurementsFile()
+{
+	return dataFolder() + BPT_FILE_MEASUREMENTS;
+}
+
+std::string tree::knowledgeFile()
+{
+	return dataFolder() + BPT_FILE_KNOWLEDGE;
+}
+
+string tree::imagesFolder() {
+	return trainingFolder() + BPT_FOLDER_COLOR_IMAGES;
 }
 
 string tree::depthImagesFolder() {

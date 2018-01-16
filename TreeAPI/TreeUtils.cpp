@@ -1,4 +1,6 @@
 #include "TreeUtils.h"
+#include <fstream>
+#include <sstream>
 
 void printTree(tree::Node * node)
 {
@@ -9,9 +11,9 @@ void printTree(tree::Node * node)
 		printTree(node->false_branch);
 }
 
-void saveTree(tree::Node * tree, ofstream& file)
+void saveTree(tree::Node * tree, std::ofstream& file)
 {
-	file << tree->toString() << endl;
+	file << tree->toString() << std::endl;
 
 	if (tree->true_branch != NULL)
 		saveTree(tree->true_branch, file);
@@ -43,18 +45,47 @@ void findResult(tree::Node* node, tree::Dataset test, std::vector<tree::Result>&
 	}
 	else {
 		printf("Fatal Error! No Result found!!!\n");
-		throw exception("No Result found!!!\n");
+		throw std::exception("No Result found!!!\n");
 	}
 }
 
-void trace(string trace)
+bool getNextRecord(std::ifstream& dataset, tree::Dataset& record)
 {
-	static ofstream traceFile(tree::debugFile());
+	std::string s;
+	std::getline(dataset, s);
+
+	if (s.empty())
+		return false;
+
+	std::stringstream ss;
+
+	ss << s;
+
+	int value = 0;
+	int feat = 0;
+	while (ss >> value) {
+		if (feat < tree::numFeatures()) {
+			record.feature[feat] = value;
+		}
+		feat++;
+	}
+
+	if (feat <= tree::numFeatures())
+		throw std::exception("getNextRecord didn't read all values!");
+	
+	record.outcome = categoryOfValue(value);
+	
+	return true;
+}
+
+void trace(std::string trace)
+{
+	static std::ofstream traceFile(tree::debugFile());
 	if (tree::isTraceActive())
-		traceFile << trace << endl;
+		traceFile << trace << std::endl;
 }
 
 void trace(const char * trc)
 {
-	trace(string(trc));
+	trace(std::string(trc));
 }

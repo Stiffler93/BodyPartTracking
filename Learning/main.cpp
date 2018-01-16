@@ -6,12 +6,16 @@
 #include "SimpleTraining.h"
 #include "ParallelTraining.h"
 #include "CategoryUtils.h"
+#include <iostream>
+#include <fstream>
 
 using namespace tree;
+using std::string;
+using std::to_string;
 
 bool checkTreeFile(string outputfile);
 bool checkTrainingInput(string inputfile);
-void readTrainingData(string inputfile, Dataset* trData, int* numTrData);
+void readTrainingData(string inputfile, Dataset* trData, int* numTrData, Dataset* testData, int* numTestData);
 
 void test(Dataset test, Node* decisionTree);
 
@@ -32,20 +36,21 @@ int main(int argc, char** argv)
 
 	const int numDS = numDatasets();
 	Dataset *trData = new Dataset[numDS];
-	int numTrData = 0;
+	Dataset *testData = new Dataset[numDS];
+	int numTrData = 0, numTestData = 0;
 
-	readTrainingData(datasetFile(), trData, &numTrData);
+	readTrainingData(datasetFile(), trData, &numTrData, testData, &numTestData);
 
 	if (isTraceActive()) {
 		for (int i = 0; i < numTrData; i++) {
 			trace(to_string(i + 1) + " >" + trData[i].toString() + "<");
 		}
 	}
-	printf("Successfully parsed %d rows of data.\n", numTrData);
+	printf("Successfully parsed data. Training data has %d records, Test data %d records.\n", numTrData, numTestData);
 
 	printf("Start Training? (y/n)\n");
 	string a; 
-	cin >> a;
+	std::cin >> a;
 
 	if (a != "y" && a != "Y")
 		return 0;
@@ -53,8 +58,8 @@ int main(int argc, char** argv)
 	clock_t begin = clock();
 
 	Node* decisionTree = NULL;
-	startSimpleTraining(trData, numTrData, decisionTree);
-	//startParallelTraining(trData, numTrData, decisionTree);
+	//startSimpleTraining(trData, numTrData, decisionTree);
+	startParallelTraining(trData, numTrData, decisionTree);
 
 	clock_t end = clock();
 	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
@@ -62,24 +67,26 @@ int main(int argc, char** argv)
 	printf("Training took %lf seconds!\n", elapsed_secs);
 
 	string b; 
-	cin >> b;
+	std::cin >> b;
 
-	testWithTrainingData(decisionTree);
+	//testWithTrainingData(decisionTree);
+	testWithTestData(decisionTree, testData, numTestData);
 
 	trace("Write training results to " + treeFile());
 	//printTree(decisionTree);
 
-	ofstream tree_file(treeFile());
+	std::ofstream tree_file(treeFile());
 	saveTree(decisionTree, tree_file);
 	tree_file.close();
 
 	freeTree(decisionTree);
 
 	//trData must not be deleted, because is already during Training
+	delete[] testData;
 
 	printf("SUCCESSFULLY built DECISION TREE\n");
 	string c;
-	cin >> c;
+	std::cin >> c;
 
 	return 0;
 }
@@ -96,7 +103,7 @@ bool checkTreeFile(string outputfile)
 		printf("Do you want to delete it? (y/n): ");
 
 		string c;
-		cin >> c;
+		std::cin >> c;
 
 		if (c == "y" || c == "Y") {
 			if (remove(outputfile.c_str()) == 0) {
@@ -127,24 +134,26 @@ bool checkTrainingInput(string inputfile)
 	return true;
 }
 
-void readTrainingData(string inputfile, Dataset* trData, int* numTrData)
+void readTrainingData(string inputfile, Dataset* trData, int* numTrData, Dataset* testData, int* numTestData)
 {
 	trace("readTrainingData()");
+	srand(time(0));
 
-	int feat;
-	int category;
+	double randNum = 0;
+	tree::Dataset record;
 
-	ifstream trDataset(inputfile);
-	while (*numTrData < numDatasets() && trDataset >> feat) {
-		trData[*numTrData].feature[0] = feat;
-		for (int i = 1; i < numFeatures(); i++) {
-			trDataset >> feat;
-			trData[*numTrData].feature[i] = feat;
+	std::ifstream trDataset(inputfile);
+	while (*numTrData + *numTestData < numDatasets() && getNextRecord(trDataset, record)) {
+		randNum = (double)rand() / (double)RAND_MAX;
+
+		if (randNum > BPT_DATASET_SUBSET_PROPORTION) {
+			testData[*numTestData] = record;
+			(*numTestData)++;
 		}
-		trDataset >> category;
-		trData[*numTrData].outcome = categoryOfValue(category);
-		
-		(*numTrData)++;
+		else {
+			trData[*numTrData] = record;
+			(*numTrData)++;
+		}
 	}
 
 	trace("Parsed input training data.");
@@ -154,17 +163,7 @@ void test(Dataset test, Node * decisionTree)
 {
 	trace("Test for " + test.outcome + " with values: >" + to_string(test.feature[0]) + "," + to_string(test.feature[1]) + "," + to_string(test.feature[2]) + "<");
 
-	/*Node* node = decisionTree;
-	while (!node->isResult()) {
-		if (((DecisionNode*)node)->dec.decide(test)) {
-			node = node->true_branch;
-		}
-		else {
-			node = node->false_branch;
-		}
-	}*/
-
-	vector<Result> results;
+	std::vector<Result> results;
 	findResult(decisionTree, test, results);
 
 	if (results.size() == 1) {

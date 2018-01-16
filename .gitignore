@@ -10,3 +10,5 @@ Debug
 *.vcxproj.filters
 *.aps
 *.rc
+Data/dataset*
+Data/debug*

@@ -1,7 +1,5 @@
 #pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 
-#define DS_LEN 11
-#define NUM_CATEGORIES 6
 #define CALC_FACTOR 10000000000
 
 __kernel void CalcImpurity2(__global unsigned int* impurity_buffer, __global double* tempVals, const unsigned int NUM_DATASETS) {

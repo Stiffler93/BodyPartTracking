@@ -4,6 +4,4 @@
 #include "DecTree.h"
 #include "CPUTrainingInterface.h"
 
-using namespace tree;
-
-void startParallelTraining(Dataset* trData, const unsigned int numTrData, Node*& rootNode);
+void startParallelTraining(tree::Dataset* trData, const unsigned int numTrData, tree::Node*& rootNode);

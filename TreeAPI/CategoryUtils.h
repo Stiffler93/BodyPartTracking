@@ -1,5 +1,5 @@
-#include <string>
 #include "TreeConstants.h"
+#include <string>
 
 std::string categoryOfValue(int category);
 

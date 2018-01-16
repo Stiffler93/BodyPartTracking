@@ -8,321 +8,170 @@
 #include "ImageRecorder.h"
 #include "Features.hpp"
 #include "Tests.h"
+#include "DecisionForest.h"
+#include "ErgonomicEvaluation.h"
+#include "3DWorldTransformations.h"
 
-using namespace tree;
+using std::string;
+using std::to_string;
 
-typedef struct NodeRefs {
-	tree::Node* node;
-	int trueBranch = 0, falseBranch = 0, nodeNum = 0;
-}NodeRefs;
+void classification(cv::Mat& image, cv::Mat& classifiedMat, tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector);
+void realTest(tree::DecisionForest& decForest);
+void testDecForestWithTrainingData(tree::DecisionForest& decForest);
 
-void decisionNode(vector<NodeRefs> *noderefs, string data);
-void resultNode(vector<NodeRefs> *noderefs, string data);
-void buildTree(tree::Node*& tree, vector<NodeRefs> *noderefs);
-void addNode(tree::Node*& node, vector<NodeRefs> *noderefs, int nodeNum);
-void classification(Mat& image, Mat& classifiedMat, tree::Dataset**& featureMatrix, tree::Node* decisionTree);
-void realTest(tree::Node* decisionTree);
-
-vector<int> referencedNodes;
-vector<int> nodeNums;
-
-int main(int argc, char** argv) 
-{
-	vector<NodeRefs> nodes;
-
-	ifstream treeFile(treeFile());
-	string data = "";
-	while (treeFile >> data) {
-		if (data.empty())
-			break;
-
-		if (data.substr(0, 1) == "D") {
-			decisionNode(&nodes, data);
-		}
-		else if (data.substr(0, 1) == "R") {
-			resultNode(&nodes, data);
-		}
-		else {
-			throw exception("Unrecognized Tree Node! Only DecisionNodes [D] and ResultNodes [R] are valid!");
-		}
+int main(int argc, char** argv) {
+	// needs to be done for WorldTransformation!!!
+	openni::Status statOpenNI;
+	printf("OpenNI initialization...\n");
+	statOpenNI = openni::OpenNI::initialize();
+	if (statOpenNI != openni::Status::STATUS_OK) {
+		puts("OpenNI initialization failed!");
+		return 1;
 	}
 
-	trace("Start Debug:");
+	puts("Asus Xtion Pro initialization...");
+	openni::Device device;
+	if (device.open(openni::ANY_DEVICE) != 0)
+	{
+		puts("Device not found !");
+		puts("Abort test");
+		openni::OpenNI::shutdown();
+		return 1;
+	}
+	puts("Asus Xtion Pro opened");
 
-	tree::Node* tree = NULL;
-	buildTree(tree, &nodes);
+	openni::VideoStream depth;
+	depth.create(device, openni::SENSOR_DEPTH);
+	depth.start();
 
-	printf("Tree successfully reconstructed!\n");
-	printf("Start Decision Tree Test: \n");
+	world::CoordinateTransformator* transformator = world::CoordinateTransformator::getInstance();
+	transformator->init(&depth);
 
-	//testWithTrainingData(tree);
-	realTest(tree);
+	openni::VideoMode paramvideo;
+	paramvideo.setResolution(MAX_COL, MAX_ROW);
+	paramvideo.setFps(FPS);
+	paramvideo.setPixelFormat(openni::PIXEL_FORMAT_DEPTH_100_UM);
 
-	ofstream tree_file(tree::treeFile());
-	saveTree(tree, tree_file);
-	tree_file.close();
+	depth.setVideoMode(paramvideo);
+	// needs to be done for WorldTransformation!!!
 
-	string s;
-	cin >> s;
+
+
+	printf("Start Inspection of Images.\n");
+
+	string image = "027.png";
+
+	string colStr = tree::imagesFolder() + image;
+	cv::Mat colImg = cv::imread(colStr);
+	string depStr = tree::depthImagesFolder() + image;
+	cv::Mat depImg = cv::imread(depStr, CV_LOAD_IMAGE_ANYDEPTH);
+
+	printf("DepImg type = %d\n", depImg.type());
+
+	double min, max;
+	cv::minMaxIdx(depImg, &min, &max);
+
+	printf("Min = %lf, Max = %lf\n", min, max);
+
+	std::vector<string> trees;
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_1.txt");
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_2.txt");
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_3.txt");
+	tree::DecisionForest decForest(trees);
+
+	tree::BodyPartDetector bpDetector = tree::BodyPartDetector(decForest);
+
+	cv::Mat classifiedMat;
+	classifiedMat.create(MAX_ROW, MAX_COL, CV_8UC3);
+
+	tree::Dataset** featureMatrix = new tree::Dataset*[MAX_ROW];
+	for (int i = 0; i < MAX_ROW; i++)
+		featureMatrix[i] = new tree::Dataset[MAX_COL];
+
+	int key = 0;
+	while (key != 27) {
+		classification(depImg, classifiedMat, featureMatrix, decForest, bpDetector);
+		imshow("Depth Image", depImg);
+		//imshow("Classification", classifiedMat);
+		key = cv::waitKey(10);
+	}
 
 	return 0;
 }
 
-void decisionNode(vector<NodeRefs> *noderefs, string data)
+int main_main(int argc, char** argv) 
 {
-	string tmp;
-	stringstream values;
-	int nodeNum = 0, refVal = 0, feature = 0, trueBranch = 0, falseBranch;
-	tmp = data.substr(2, data.length() - 3);
-
-	for (int i = 0; i < tmp.length(); i++) {
-		char c = tmp.at(i);
-		
-
-		if (c == ',')
-			c = ' ';
-
-		values << c;
-	}
-
-	values >> nodeNum >> refVal >> feature >> trueBranch >> falseBranch;
-
-	if (find(nodeNums.begin(), nodeNums.end(), nodeNum) != nodeNums.end()) {
-		trace("nodeNum " + to_string(nodeNum) + " was already handled before!");
-	}
-
-	if (find(referencedNodes.begin(), referencedNodes.end(), trueBranch) != referencedNodes.end()) {
-		trace("Node " + to_string(trueBranch) + " is referenced multiple times");
-	}
-
-	if (find(referencedNodes.begin(), referencedNodes.end(), falseBranch) != referencedNodes.end()) {
-		trace("Node " + to_string(falseBranch) + " is referenced multiple times");
-	}
-
-	nodeNums.push_back(nodeNum);
-	referencedNodes.push_back(trueBranch);
-	referencedNodes.push_back(falseBranch);
-
-	NodeRefs ref;
-	ref.trueBranch = trueBranch;
-	ref.falseBranch = falseBranch;
-	ref.nodeNum = nodeNum;
-	ref.node = (tree::Node*) new DecisionNode(Decision(refVal, feature));
-
-	noderefs->push_back(ref);
-}
-
-void resultNode(vector<NodeRefs> *noderefs, string data)
-{
-	string tmp;
-	stringstream values;
-
-	char c;
-	for (int i = 1; i < data.length(); i++) {
-		c = data.at(i);
-
-		if (c == 'C' || c == '(' || c == ')')
-			continue;
-		
-		if (c == ',')
-			c = ' ';
-
-		values << c;
-	}
-
-	string numNode;
-	string outcome;
-	string probability;
-	vector<Result> results;
-
-	values >> numNode;
-	while (values >> outcome >> probability) {
-		Result r;
-		r.outcome = outcome;
-		r.probability = stof(probability.c_str());
-		results.push_back(r);
-	}
 	
-	NodeRefs ref;
-	ref.trueBranch = 0;
-	ref.falseBranch = 0;
-	ref.nodeNum = stoi(numNode);
-	ref.node = (tree::Node*) new ResultNode(results);
+	printf("Start Decision Tree Test: \n");
+	std::vector<string> trees;
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_1.txt");
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_2.txt");
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_3.txt");
+	//trees.push_back(tree::treeFile());
+	tree::DecisionForest decForest(trees);
 
-	noderefs->push_back(ref);
+	realTest(decForest);
+	//testDecForestWithTrainingData(decForest);
+
+	string s;
+	std::cin >> s;
+
+	return 0;
 }
 
-void buildTree(tree::Node*& tree, vector<NodeRefs>* noderefs)
-{
-	//printf("build tree: \n");
-	NodeRefs& ref = noderefs->at(0);
-	if (ref.nodeNum != 1) {
-		trace("Wrong nodeNum! Was supposed to be 1, but is " + to_string(ref.nodeNum));
-	}
-
-	tree = ref.node;
-	ref.node = NULL;
-	if (ref.trueBranch != 0)
-		addNode(tree->true_branch, noderefs, ref.trueBranch);
-	if (ref.falseBranch != 0)
-		addNode(tree->false_branch, noderefs, ref.falseBranch);
-
-	for (NodeRefs r : *noderefs) {
-		if (r.node != NULL) {
-			trace("Node " + to_string(r.nodeNum) + " points to Node!");
-		}
-	}
-}
-
-void addNode(tree::Node*& node, vector<NodeRefs>* noderefs, int nodeNum)
-{
-	//printf("Add Node with num %d\n", nodeNum - 1);
-	NodeRefs& ref = noderefs->at(nodeNum - 1);
-	if (ref.nodeNum != nodeNum) {
-		trace("Correct node not immediately found!");
-		int diff = nodeNum - ref.nodeNum;
-		ref = noderefs->at(ref.nodeNum + diff);
-
-		if (ref.nodeNum != nodeNum) {
-			trace("Node not found at all!");
-			return;
-		}
-	}
-
-	if (ref.nodeNum != nodeNum) {
-		trace("Wrong nodeNum! Was supposed to be " + to_string(nodeNum) + ", but is " + to_string(ref.nodeNum));
-	}
-
-	node = ref.node;
-	ref.node = NULL;
-
-	if (ref.trueBranch != 0)
-		addNode(node->true_branch, noderefs, ref.trueBranch);
-	if (ref.falseBranch != 0)
-		addNode(node->false_branch, noderefs, ref.falseBranch);
-}
-
-//void test(tree::Node * decisionTree)
-//{
-//	string dataset = datasetFile();
-//	ifstream features(dataset);
-//
-//	int feat1, feat2, feat3, feat4, feat5, feat6, feat7, feat8, feat9, feat10;
-//	string category;
-//	int total = 0, correctClass = 0, falseClass = 0;
-//	vector<Result> results;
-//
-//	while (features >> feat1 >> feat2 >> feat3 >> feat4 >> feat5 >> feat6 >> feat7 >> feat8 >> feat9 >> feat10 >> category) {
-//		Dataset set;
-//		set.feature[0] = feat1;
-//		set.feature[1] = feat2;
-//		set.feature[2] = feat3;
-//		set.feature[3] = feat4;
-//		set.feature[4] = feat5;
-//		set.feature[5] = feat6;
-//		set.feature[6] = feat7;
-//		set.feature[7] = feat8;
-//		set.feature[8] = feat9;
-//		set.feature[9] = feat10;
-//		set.outcome = category;
-//
-//		total++;
-//
-//		results.clear();
-//		findResult(decisionTree, set, results);
-//
-//		if (results.size() == 0) {
-//			falseClass++;
-//			//printf("No Result returned\n");
-//		}
-//		else {
-//			if (results.size() == 1) {
-//				Result res = results.at(0);
-//				if (res.outcome == category) {
-//					correctClass++;
-//				}
-//				else {
-//					//printf("Wrong result.\n");
-//					falseClass++;
-//				}
-//			}
-//			else {
-//				bool found = false;
-//				float prob = 0;
-//
-//				for(Result res : results) 
-//					if (res.outcome == category) {
-//						found = true;
-//						prob = res.probability;
-//					}
-//
-//				if (found) {
-//					correctClass++;
-//					//printf("Found, but low probability: >%f<\n", prob);
-//				}
-//				else {
-//					falseClass++;
-//				}
-//			}
-//		}
-//	}
-//
-//	printf("\n\nTest finished.\n");
-//	printf("Tested a total of %d Datasets.\n", total);
-//	printf("Correct: >%d<, False: >%d<\n", correctClass, falseClass);
-//	printf("Correctly classified %lf percent.\n", (float)correctClass / (float)total * 100);
-//}
-
-void realTest(tree::Node * decisionTree)
+void realTest(tree::DecisionForest& decForest)
 {
 	openni::Status statOpenNI;
 	printf("OpenNI initialization...\n");
-	statOpenNI = OpenNI::initialize();
+	statOpenNI = openni::OpenNI::initialize();
 	if (statOpenNI != openni::Status::STATUS_OK) {
 		puts("OpenNI initialization failed!");
 		return;
 	}
 
 	puts("Asus Xtion Pro initialization...");
-	Device device;
+	openni::Device device;
 	if (device.open(openni::ANY_DEVICE) != 0)
 	{
 		puts("Device not found !");
 		puts("Abort test");
-		OpenNI::shutdown();
+		openni::OpenNI::shutdown();
 		return;
 	}
 	puts("Asus Xtion Pro opened");
 
-	VideoStream depth;
-	depth.create(device, SENSOR_DEPTH);
+	openni::VideoStream depth;
+	depth.create(device, openni::SENSOR_DEPTH);
 	depth.start();
 
-	VideoMode paramvideo;
+	world::CoordinateTransformator* transformator = world::CoordinateTransformator::getInstance();
+	transformator->init(&depth);
+
+	openni::VideoMode paramvideo;
 	paramvideo.setResolution(MAX_COL, MAX_ROW);
 	paramvideo.setFps(FPS);
-	paramvideo.setPixelFormat(PIXEL_FORMAT_DEPTH_100_UM);
+	paramvideo.setPixelFormat(openni::PIXEL_FORMAT_DEPTH_100_UM);
 
 	depth.setVideoMode(paramvideo);
 
-	VideoStream** stream = new VideoStream*[1];
+	openni::VideoStream** stream = new openni::VideoStream*[1];
 	stream[0] = &depth;
 	puts("Kinect initialization completed");
 
 	puts("Continue? (y/n)");
 	string s;
-	cin >> s;
+	std::cin >> s;
 
 	if (s != "y") {
 		puts("Shutdown OpenNI");
 		depth.stop();
 		depth.destroy();
 		device.close();
-		OpenNI::shutdown();
+		openni::OpenNI::shutdown();
 		return;
 	}
 
-	util::ImageRecorder recorder(device, stream, decisionTree, &classification);
+	util::ImageRecorder recorder(device, stream, decForest, &classification);
 	recorder.run();
 
 	printf("Release OpenNI resources.");
@@ -331,33 +180,68 @@ void realTest(tree::Node * decisionTree)
 	printf(".");
 	device.close();
 	printf(".");
-	OpenNI::shutdown();
+	openni::OpenNI::shutdown();
 	printf("done.\n");
 }
 
-void classification(Mat& image, Mat& classifiedMat, tree::Dataset**& featureMatrix, tree::Node* decisionTree) {
+void classification(cv::Mat& image, cv::Mat& classifiedMat, tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector) {
 	classifiedMat = 0;
 	
-	featurizeImage(image, featureMatrix);
-	Vec3b color;
+	tree::BodyPartLocations locs = bpDetector.getBodyPartLocations(image);
+	ergonomics::ErgonomicEvaluation::getInstance().classify(locs);
+	//printf("BPT Status = %d\r", bpDetector.state());
+	//printf("Head<%d|%d>, Neck<%d|%d>, LShould<%d|%d>, RShould<%d|%d>, Sternum<%d|%d>\r", locs.locs[LOC_HEAD].col, locs.locs[LOC_HEAD].row,
+	//	locs.locs[LOC_NECK].col, locs.locs[LOC_NECK].row, locs.locs[LOC_L_SHOULDER].col, locs.locs[LOC_L_SHOULDER].row, locs.locs[LOC_R_SHOULDER].col, 
+	//	locs.locs[LOC_R_SHOULDER].row, locs.locs[LOC_STERNUM].col, locs.locs[LOC_STERNUM].row);
 
-	for (int row = 0; row < MAX_ROW; row++) {
-		for (int col = 0; col < MAX_COL; col++) {
-			tree::Dataset set = featureMatrix[row][col];
+	double min, max;
+	cv::minMaxIdx(image, &min, &max);
 
-			if (set.outcome == OTHER) {
-				vector<Result> result;
-				findResult(decisionTree, set, result);
+	cv::Mat norm;
+	norm.create(image.size(), image.type());
+	image.copyTo(norm);
 
-				// atm only one result is returned
-				Result res = result.at(0);
-				color = getBGR(res.outcome);
-			}
-			else {
-				color = { 0,0,0 };
-			}
-			
-			classifiedMat.at<Vec3b>(row, col) = color;
+	norm -= min;
+	norm = norm / max * 255;
+	norm.convertTo(norm, CV_8U);
+
+	cv::Mat norm3ch;
+	std::vector<cv::Mat> normArr = { norm, norm, norm };
+	cv::merge(normArr, norm3ch);
+	
+	cv::circle(norm3ch, cv::Point(locs.locs[LOC_HEAD].col, locs.locs[LOC_HEAD].row), 5, cv::Scalar(getBGR(HEAD)));
+	cv::circle(norm3ch, cv::Point(locs.locs[LOC_NECK].col, locs.locs[LOC_NECK].row), 5, cv::Scalar(getBGR(NECK)));
+	cv::circle(norm3ch, cv::Point(locs.locs[LOC_L_SHOULDER].col, locs.locs[LOC_L_SHOULDER].row), 5, cv::Scalar(getBGR(LEFT_SHOULDER)));
+	cv::circle(norm3ch, cv::Point(locs.locs[LOC_R_SHOULDER].col, locs.locs[LOC_R_SHOULDER].row), 5, cv::Scalar(getBGR(RIGHT_SHOULDER)));
+	cv::circle(norm3ch, cv::Point(locs.locs[LOC_STERNUM].col, locs.locs[LOC_STERNUM].row), 5, cv::Scalar(getBGR(STERNUM)));
+
+	cv::imshow("Skeleton Joints", norm3ch);
+}
+
+void testDecForestWithTrainingData(tree::DecisionForest& decForest) {
+	printf("Start Test with own Training Data: \n");
+	string dataset = tree::datasetFile();
+	std::ifstream features(dataset);
+
+	int total = 0, correctClass = 0, falseClass = 0;
+
+	tree::Dataset record;
+	while(getNextRecord(features, record)) {
+		total++;
+
+		string outcome = decForest.classify(record);
+		if (outcome == record.outcome) {
+			correctClass++;
+		}
+		else {
+			falseClass++;
 		}
 	}
+
+	features.close();
+
+	std::printf("\n\nTest finished.\n");
+	std::printf("Tested a total of %d Datasets.\n", total);
+	std::printf("Correct: >%d<, False: >%d<\n", correctClass, falseClass);
+	std::printf("Correctly classified %lf percent.\n", (float)correctClass / (float)total * 100);
 }

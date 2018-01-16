@@ -1,29 +1,20 @@
 #include "SimpleTraining.h"
-#include <map>
-#include <cmath>
 #include "CategoryUtils.h"
-#include <ctime>
+#include "CPUTrainingInterface.h"
+#include <map>
+
+using namespace tree;
+using std::string;
 
 void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* numTrDataLeft) {
-	//clock_t begin = clock();
 
-	//std::printf("Call buildTree(). numTrData = %d\n", numTrData);
-	//std::printf("TrData: \n");
-	bool isHeterogenous = false;
-	string temp = trData[0].outcome;
-	for (int i = 1; i <= numTrData; i++) {
-		if (temp != trData[i - 1].outcome) {
-			isHeterogenous = true;
-			break;
-		}
-		//std::printf("\t%d.: >%s<\n", i, trData[i - 1].toString().c_str());
-	}
+	float imp = impurity(trData, numTrData);
 
 	BestSplit split;
-	if(isHeterogenous)
+	if(imp > BPT_STOP_EVALUATION_IMPURITY)
 		split = findBestSplit(trData, numTrData);
 
-	if (numTrData <= BPT_STOP_EVALUATION_LIMIT || split.gain == 0) {
+	if (imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || split.gain == 0) {
 		if (numTrData == 1 || isPure(trData, numTrData)) {
 			Result res;
 			res.outcome = trData[0].outcome;
@@ -31,16 +22,16 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 			decNode = (Node*) new ResultNode(res);
 		}
 		else {
-			map<string, int> results;
+			std::map<string, int> results;
 			for (int i = 0; i < numTrData; i++) {
 				string category = trData[i].outcome;
-				map<string, int>::iterator val = results.lower_bound(category);
+				std::map<string, int>::iterator val = results.lower_bound(category);
 
 				if (val != results.end() && !(results.key_comp()(category, val->first))) {
 					val->second++;
 				}
 				else {
-					results.insert(val, map<string, int>::value_type(category, 1));
+					results.insert(val, std::map<string, int>::value_type(category, 1));
 				}
 			}
 
@@ -50,7 +41,7 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 				sum += it.second;
 			}
 
-			vector<Result> endRes;
+			std::vector<Result> endRes;
 			for (auto it : results) {
 				Result r;
 				r.outcome = it.first;
@@ -88,7 +79,7 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 
 void startSimpleTraining(Dataset* trData, int numTrData, Node*& rootNode)
 {
-	unsigned long numTrDataLeft = BPT_NUM_DATASETS;
+	unsigned long numTrDataLeft = numTrData;
 	printf("NumTrDataLeft: %ld\n", numTrDataLeft);
 
 	buildTree(rootNode, trData, numTrData, &numTrDataLeft);

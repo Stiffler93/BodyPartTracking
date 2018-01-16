@@ -3,10 +3,7 @@
 
 //32768 = max local memory, 8192 is a quarter
 #define MAX_LOCAL_MEMORY 8192
-#define DS_LEN 11
-#define NUM_CATEGORIES 6
 #define CALC_FACTOR 10000000000
-#define CATEGORY 10
 #define OTHER 0x0E
 #define PARTITION_ONE 0x80
 #define PARTITION_TWO 0x40

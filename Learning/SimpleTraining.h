@@ -1,6 +1,3 @@
 #include "DecTree.h"
-#include "CPUTrainingInterface.h"
 
-using namespace tree;
-
-void startSimpleTraining(Dataset* trData, int numTrData, Node*& rootNode);
+void startSimpleTraining(tree::Dataset* trData, int numTrData, tree::Node*& rootNode);

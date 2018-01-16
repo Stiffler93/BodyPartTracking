@@ -1,33 +1,31 @@
-#include <string>
-//#include <iostream>
-#include <vector>
-#include <windows.h>
-#include <strsafe.h>
 #include "opencv2\opencv.hpp"
-#include "Features.hpp"
 #include "DecTree.h"
 #include "TreeConstants.h"
 #include "TreeSettings.h"
+#include "Features.hpp"
+#include <string>
+#include <vector>
+#include <iostream>
+#include <fstream>
+#include <windows.h>
+#include <strsafe.h>
 
-using namespace std;
-using namespace cv;
-using namespace tree;
+using std::string;
 
 void pause();
 bool checkTrainingDataFolder(string trDataFolder);
-vector<string> getFilesInDirectory(string trDataFolder);
-vector<string> getUnifiedTrainingData(string trDataFolder);
-void show(Mat& colImg, Mat& depImg);
+std::vector<string> getFilesInDirectory(string trDataFolder);
+std::vector<string> getUnifiedTrainingData(string trDataFolder);
 
 int main(int argc, char** argv) 
 {
-	if (!checkTrainingDataFolder(trainingFolder())) {
+	if (!checkTrainingDataFolder(tree::trainingFolder())) {
 		printf("Exit Program.\n");
 		pause();
 		return 1;
 	}
 
-	vector<string> trData = getUnifiedTrainingData(trainingFolder());
+	std::vector<string> trData = getUnifiedTrainingData(tree::trainingFolder());
 
 	printf("Found following Training Data:\n");
 	for (string data : trData)
@@ -38,7 +36,11 @@ int main(int argc, char** argv)
 		return 2;
 	}
 
-	Mat feat1, feat2, feat3, feat4, feat5, feat6, feat7, feat8, feat9, feat10;
+	cv::Mat feat1, feat2, feat3, feat4, feat5, feat6, feat7, feat8, feat9, feat10;
+	cv::Mat feat11, feat12, feat13, feat14, feat15, feat16, feat17, feat18, feat19, feat20;
+	cv::Mat feat21, feat22, feat23, feat24, feat25, feat26;
+	cv::Mat horizIntegral, vertIntegral, integral;
+
 	feat1.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 	feat2.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 	feat3.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
@@ -49,44 +51,92 @@ int main(int argc, char** argv)
 	feat8.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 	feat9.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 	feat10.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat11.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat12.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat13.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat14.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat15.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat16.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat17.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat18.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat19.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat20.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat21.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat22.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat23.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat24.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat25.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	feat26.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	
+	horizIntegral.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	vertIntegral.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+	integral.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 
-	ofstream features(datasetFile());
+	std::ofstream features(tree::datasetFile());
 
 	for (string image : trData) {
 
 		printf("Handle image %s\n", image.c_str());
 
-		string colStr = classifiedImagesFolder() + image;
-		Mat colImg = imread(colStr);
+		string colStr = tree::classifiedImagesFolder() + image;
+		cv::Mat colImg = cv::imread(colStr);
 
-		string depStr = depthImagesFolder() + image;
-		Mat depImg = imread(depStr, CV_LOAD_IMAGE_ANYDEPTH);
+		string depStr = tree::depthImagesFolder() + image;
+		cv::Mat depImg = cv::imread(depStr, CV_LOAD_IMAGE_ANYDEPTH);
 
-		Mat subject = Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+		cv::Mat subject;
+		
+		int imgNumber = atoi(image.substr(0, image.find_first_of('.')).c_str());
+		
+		if (imgNumber < 49 || imgNumber > 146) {
+			subject = cv::Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+			getSubject(depImg, subject);
+		}
+		else {
+			subject = depImg;
+		}
 
-		getSubject(depImg, subject);
+		getVerticalIntegral(subject, vertIntegral);
+		getHorizontalIntegral(subject, horizIntegral);
+		getIntegral(subject, integral);
 
-		feature1(subject, feat1, 30);
-		feature2(subject, feat2, 20);
-		feature3(subject, feat3, 20);
-		feature4(subject, feat4, 20);
-		feature5(subject, feat5, 40);
-		feature6(subject, feat6, 60);
-		feature7(subject, feat7, 30);
-		feature8(subject, feat8, 30);
-		feature9(subject, feat9, 50);
-		feature10(subject, feat10, 50);
+		feature1(subject, feat1, depImg, 30);
+		feature2(subject, feat2, depImg, 20);
+		feature3(subject, feat3, depImg, 20);
+		feature4(subject, feat4, depImg, 20);
+		feature5(subject, feat5, depImg, 40);
+		feature6(subject, feat6, depImg, 60);
+		feature7(subject, feat7, depImg, 30);
+		feature8(subject, feat8, depImg, 30);
+		feature9(subject, feat9, depImg, 50);
+		feature10(subject, feat10, depImg, 50);
+		feature1(subject, feat11, depImg, 15);
+		feature2(subject, feat12, depImg, 10);
+		feature3(subject, feat13, depImg, 10);
+		feature4(subject, feat14, depImg, 10);
+		feature5(subject, feat15, depImg, 20);
+		feature6(subject, feat16, depImg, 30);
+		feature7(subject, feat17, depImg, 15);
+		feature8(subject, feat18, depImg, 15);
+		feature9(subject, feat19, depImg, 25);
+		feature10(subject, feat20, depImg, 25);
+		feature11(subject, feat21, MAX_COL, horizIntegral);
+		feature11(subject, feat22, 20, horizIntegral);
+		feature12(subject, feat23, MAX_ROW, vertIntegral);
+		feature12(subject, feat24, 20, vertIntegral);
+		feature13(subject, feat25, 20, integral);
+		feature13(subject, feat26, 50, integral);
 
-		vector<Dataset> datasets;
-		Dataset set;
-		Vec3b colors;
+		size_t numDatasets = 0;
+		tree::Dataset set;
+		cv::Vec3b colors;
 
 		for (int row = 0; row < MAX_ROW; row++) {
 			for (int col = 0; col < MAX_COL; col++) {
 				if (subject.at<ushort>(row, col) == 0)
 					continue;
 
-				colors = colImg.at<Vec3b>(row, col);
+				colors = colImg.at<cv::Vec3b>(row, col);
 				set.outcome = getCategory(colors[2], colors[1], colors[0]);
 
 				if (set.outcome == NONE)
@@ -102,19 +152,29 @@ int main(int argc, char** argv)
 				set.feature[7] = feat8.at<ushort>(row, col);
 				set.feature[8] = feat9.at<ushort>(row, col);
 				set.feature[9] = feat10.at<ushort>(row, col);
+				set.feature[10] = feat11.at<ushort>(row, col);
+				set.feature[11] = feat12.at<ushort>(row, col);
+				set.feature[12] = feat13.at<ushort>(row, col);
+				set.feature[13] = feat14.at<ushort>(row, col);
+				set.feature[14] = feat15.at<ushort>(row, col);
+				set.feature[15] = feat16.at<ushort>(row, col);
+				set.feature[16] = feat17.at<ushort>(row, col);
+				set.feature[17] = feat18.at<ushort>(row, col);
+				set.feature[18] = feat19.at<ushort>(row, col);
+				set.feature[19] = feat20.at<ushort>(row, col);
+				set.feature[20] = feat21.at<ushort>(row, col);
+				set.feature[21] = feat22.at<ushort>(row, col);
+				set.feature[22] = feat23.at<ushort>(row, col);
+				set.feature[23] = feat24.at<ushort>(row, col);
+				set.feature[24] = feat25.at<ushort>(row, col);
+				set.feature[25] = feat26.at<ushort>(row, col);
 
-				datasets.push_back(set);
+				features << set.toString() << std::endl;
+				numDatasets++;
 			}
 		}
 
-		size_t size = datasets.size();
-		printf("Algorithm classified %zd pixels for Image %s.\n", size, image.c_str());
-
-		size_t written = 0;
-		for (Dataset set : datasets) {
-			features << set.toString() << endl;
-		}
-
+		printf("Algorithm classified %zd pixels for Image %s.\n", numDatasets, image.c_str());
 		printf("\nFinished image %s.\n", image.c_str());
 	}
 
@@ -130,7 +190,7 @@ int main(int argc, char** argv)
 void pause()
 {
 	string c;
-	cin >> c;
+	std::cin >> c;
 }
 
 bool checkTrainingDataFolder(string trDataFolder)
@@ -145,24 +205,24 @@ bool checkTrainingDataFolder(string trDataFolder)
 
 	bool error = false;
 
-	if (stat(classifiedImagesFolder().c_str(), &buf) != 0)
+	if (stat(tree::classifiedImagesFolder().c_str(), &buf) != 0)
 	{
-		printf("%s does not exist!\n", classifiedImagesFolder().c_str());
+		printf("%s does not exist!\n", tree::classifiedImagesFolder().c_str());
 		error = true;
 	}
 
-	if (stat(depthImagesFolder().c_str(), &buf) != 0)
+	if (stat(tree::depthImagesFolder().c_str(), &buf) != 0)
 	{
-		printf("%s does not exist!\n", depthImagesFolder().c_str());
+		printf("%s does not exist!\n", tree::depthImagesFolder().c_str());
 		error = true;
 	}
 
 	return !error;
 }
 
-vector<string> getFilesInDirectory(string trDataFolder)
+std::vector<string> getFilesInDirectory(string trDataFolder)
 {
-	vector<string> results;
+	std::vector<string> results;
 
 	WIN32_FIND_DATA ffd;
 	TCHAR szDir[MAX_PATH];
@@ -201,7 +261,7 @@ vector<string> getFilesInDirectory(string trDataFolder)
 	if (dwError != ERROR_NO_MORE_FILES)
 	{
 		printf("Error raised!\n");
-		return vector<string>();
+		return std::vector<string>();
 	}
 
 	FindClose(hFind);
@@ -209,13 +269,13 @@ vector<string> getFilesInDirectory(string trDataFolder)
 	return results;
 }
 
-vector<string> getUnifiedTrainingData(string trDataFolder)
+std::vector<string> getUnifiedTrainingData(string trDataFolder)
 {
-	vector<string> trdata;
-	vector<string> colData = getFilesInDirectory(classifiedImagesFolder());
-	vector<string> depData = getFilesInDirectory(depthImagesFolder());
+	std::vector<string> trdata;
+	std::vector<string> colData = getFilesInDirectory(tree::classifiedImagesFolder());
+	std::vector<string> depData = getFilesInDirectory(tree::depthImagesFolder());
 
-	vector<string>::iterator colIt = colData.begin(), depIt = depData.begin();
+	std::vector<string>::iterator colIt = colData.begin(), depIt = depData.begin();
 	while (colIt != colData.end() && depIt != depData.end()) {
 		if (*colIt == *depIt) {
 			trdata.push_back(*colIt);
@@ -227,10 +287,4 @@ vector<string> getUnifiedTrainingData(string trDataFolder)
 	}
 
 	return trdata;
-}
-
-void show(Mat& colImg, Mat& depImg)
-{
-	imshow("Color Image", colImg);
-	imshow("Depth Image", depImg);
 }

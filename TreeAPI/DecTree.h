@@ -1,23 +1,17 @@
 #ifndef DEC_TREE
 #define DEC_TREE
 
-#include <string>
-#include <sstream>
-#include <iostream>
-#include <fstream>
-#include <functional>
-#include <vector>
-#include <map>
 #include "TreeSettings.h"
 #include "CategoryUtils.h"
-
-using namespace std;
+#include <string>
+#include <sstream>
+#include <vector>
 
 namespace tree {
 
 typedef struct Dataset {
 	short feature[BPT_NUM_FEATURES]; // think about a better way to use numFeatures()
-	string outcome;
+	std::string outcome;
 
 	unsigned short* toArray() {
 		const int number = BPT_NUM_FEATURES + 1;
@@ -27,8 +21,8 @@ typedef struct Dataset {
 
 		return arr;
 	};
-	string toString() {
-		stringstream ss;
+	std::string toString() {
+		std::stringstream ss;
 		for (int i = 0; i < numFeatures(); i++)
 			ss << feature[i] << " ";
 		ss << categoryToValue(outcome);
@@ -37,12 +31,12 @@ typedef struct Dataset {
 } Dataset;
 
 typedef struct UniqueValues {
-	vector<int> vals;
+	std::vector<int> vals;
 	int numVals = 0;
 } UniqueValues;
 
 typedef struct Result {
-	string outcome = "";
+	std::string outcome = "";
 	float probability = 0;
 } Result;
 
@@ -51,7 +45,6 @@ typedef struct Partition {
 	int true_branch_size = 0, false_branch_size = 0;
 } Partition;
 
-#pragma once
 class Decision {
 public:
 	Decision();
@@ -71,13 +64,12 @@ enum NodeType {
 	RESULT = 1
 };
 
-#pragma once
 class Node {
 public:
 	Node(NodeType type);
 	bool isResult() { return type == RESULT; }
 	Node* false_branch, *true_branch;
-	virtual string toString() = 0;
+	virtual std::string toString() = 0;
 	int getNum() { return numNode; }
 protected:
 	NodeType type;
@@ -85,23 +77,32 @@ protected:
 	int numNode;
 };
 
-#pragma once
 class DecisionNode : tree::Node {
 public:
 	DecisionNode(Decision decision);
 	Decision dec;
-	string toString();
+	std::string toString();
 };
 
-#pragma once
 class ResultNode : tree::Node {
 public:
 	ResultNode(Result result);
-	ResultNode(vector<Result> result);
-	string toString();
-	vector<Result> result;
+	ResultNode(std::vector<Result> result);
+	std::string toString();
+	std::vector<Result> result;
 	int numResults;
 };
+
+typedef struct NodeRefs {
+	Node* node;
+	int trueBranch = 0, falseBranch = 0, nodeNum = 0;
+}NodeRefs;
+
+void decisionNode(std::vector<tree::NodeRefs>& noderefs, std::string data);
+void resultNode(std::vector<tree::NodeRefs>& noderefs, std::string data);
+void buildTree(tree::Node*& tree, std::vector<tree::NodeRefs>& noderefs);
+void addNode(tree::Node*& node, std::vector<tree::NodeRefs>& noderefs, int nodeNum);
+
 
 }
 

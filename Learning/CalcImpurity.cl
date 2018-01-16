@@ -1,7 +1,5 @@
 #pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 
-#define DS_LEN 11
-#define NUM_CATEGORIES 6
 #define CALC_FACTOR 10000000000
 
 __kernel void CalcImpurity(__global const unsigned short* dataset, __global unsigned int* impurity_buffer, const unsigned int NUM_DATASETS) {
@@ -23,7 +21,7 @@ __kernel void CalcImpurity(__global const unsigned short* dataset, __global unsi
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	if(gid < NUM_DATASETS) {
-		short category = dataset[gid * DS_LEN + DS_LEN - 1];
+		short category = dataset[gid * DS_LEN + CATEGORY];
 		atomic_inc(&loc_impurity_buffer[category]);
 	}
 	

@@ -2,17 +2,26 @@
 #include "TreeConstants.h"
 
 using namespace util;
+using namespace openni;
+using namespace cv;
+using namespace std;
+using namespace tree;
 
-//typedef cv::Point_<uint8_t> Pixel;
-
-ImageRecorder::ImageRecorder(Device & device, VideoStream ** streams, tree::Node* decisionTree, function<void(Mat& img, Mat& classifiedImg, tree::Dataset**& featureMatrix, tree::Node* decTree)> classification)
-	:device(device), streams(streams), decTree(decisionTree), classification(classification) {
+ImageRecorder::ImageRecorder(Device & device, VideoStream ** streams, tree::DecisionForest& decForest, function<void(Mat& img, Mat& classifiedImg, 
+	tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector)> classification)
+	:device(device), streams(streams), decForest(decForest), classification(classification) {
 	featureMatrix = new tree::Dataset*[MAX_ROW];
 	for (int i = 0; i < MAX_ROW; i++)
 		featureMatrix[i] = new tree::Dataset[MAX_COL];
+
+	bpDetector = BodyPartDetector(decForest);
 }
 
-ImageRecorder::~ImageRecorder() {}
+ImageRecorder::~ImageRecorder() {
+	for (int i = 0; i < MAX_ROW; i++)
+		delete[] featureMatrix[i];
+	delete[] featureMatrix;
+}
 
 void ImageRecorder::createWindows() { namedWindow(WINDOW_DEPTH, CV_WINDOW_AUTOSIZE); }
 
@@ -52,9 +61,9 @@ void ImageRecorder::readFrame(VideoStream& stream, VideoFrameRef& frame)
 
 void ImageRecorder::processImage(Mat& img, Stream stream, const char * window)
 {
-	classification(img, classifiedMat, featureMatrix, decTree);
-	imshow(window, img);
-	imshow("Classified Image", classifiedMat);
+	classification(img, classifiedMat, featureMatrix, decForest, bpDetector);
+	//imshow(window, img);
+	//imshow("Classified Image", classifiedMat);
 }
 
 void ImageRecorder::run()

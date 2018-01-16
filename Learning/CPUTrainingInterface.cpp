@@ -1,7 +1,11 @@
 #include "CPUTrainingInterface.h"
 #include "TreeUtils.h"
+#include <map>
 
-bool isPure(Dataset* trData, int numTrData) {
+using namespace tree;
+using std::string;
+
+bool isPure(tree::Dataset* trData, int numTrData) {
 	string ref = trData[0].outcome;
 	for (int i = 1; i < numTrData; i++) {
 		string name = trData[i].outcome;
@@ -13,7 +17,7 @@ bool isPure(Dataset* trData, int numTrData) {
 }
 
 float impurity(Dataset* trData, int numTrData) {
-	map<string, int> category_counts;
+	std::map<string, int> category_counts;
 
 	for (int i = 0; i < numTrData; i++) {
 		string name = trData[i].outcome;
@@ -75,7 +79,7 @@ UniqueValues calcUniqueVals(Dataset* trData, int numTrData, int feature) {
 	for (int i = 0; i < numTrData; i++) {
 		int val = trData[i].feature[feature];
 
-		vector<int>::iterator it = values.vals.begin();
+		std::vector<int>::iterator it = values.vals.begin();
 		for (; it != values.vals.end(); ++it) {
 			if (*it == val)
 				break;
@@ -104,26 +108,26 @@ BestSplit findBestSplit(Dataset* trData, int numTrData) {
 	part.true_branch = new Dataset[numTrData];
 	part.false_branch = new Dataset[numTrData];
 
-	int numUniqueVals = 0;
-	for (int feat = 0; feat < numFeatures(); feat++) {
-		UniqueValues unVals = calcUniqueVals(trData, numTrData, feat);
-		numUniqueVals += unVals.numVals;
-	}
-
 	int uniqueVal = 0;
 
+	//trace("Unique Vals: ");
+
 	for (int feat = 0; feat < numFeatures(); feat++) {
 		UniqueValues unVals = calcUniqueVals(trData, numTrData, feat);
 
-		for (vector<int>::iterator it = unVals.vals.begin(); it != unVals.vals.end(); ++it) {
+		//for (int i = 0; i < unVals.numVals; i++) {
+		//	trace("UniqueVal: >" + std::to_string(feat) + "," + std::to_string(unVals.vals[i]) + "<");
+		//}
+
+		for (std::vector<int>::iterator it = unVals.vals.begin(); it != unVals.vals.end(); ++it) {
 			uniqueVal++;
 
 			Decision dec(*it, feat);
 
 			partition(&part, trData, numTrData, dec);
 
-			//if (part.false_branch_size == 0 || part.true_branch_size == 0)
-			//	continue;
+			if (part.false_branch_size == 0 || part.true_branch_size == 0)
+				continue;
 
 			float gain = infoGain(part, current_uncertainty);
 			const int FACTOR = 1000000;
@@ -133,8 +137,6 @@ BestSplit findBestSplit(Dataset* trData, int numTrData) {
 			if (/*gain > split.gain*/newGain > oldGain) {
 				split.gain = gain;
 				split.decision = dec;
-				//std::printf("newGain = %d, oldGain = %d\n", newGain, oldGain);
-				//std::printf("%Lf > %Lf -> new Decision >%d,%d< found!\n", gain, split.gain, split.decision.feature, split.decision.refVal);
 			}
 		}
 	}
