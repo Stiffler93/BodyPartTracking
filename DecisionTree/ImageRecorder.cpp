@@ -8,11 +8,11 @@ using namespace std;
 using namespace tree;
 
 ImageRecorder::ImageRecorder(Device & device, VideoStream ** streams, tree::DecisionForest& decForest, function<void(Mat& img, Mat& classifiedImg, 
-	tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector)> classification)
+	tree::Record**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector)> classification)
 	:device(device), streams(streams), decForest(decForest), classification(classification) {
-	featureMatrix = new tree::Dataset*[MAX_ROW];
+	featureMatrix = new tree::Record*[MAX_ROW];
 	for (int i = 0; i < MAX_ROW; i++)
-		featureMatrix[i] = new tree::Dataset[MAX_COL];
+		featureMatrix[i] = new tree::Record[MAX_COL];
 
 	bpDetector = BodyPartDetector(decForest);
 }
@@ -61,6 +61,7 @@ void ImageRecorder::readFrame(VideoStream& stream, VideoFrameRef& frame)
 
 void ImageRecorder::processImage(Mat& img, Stream stream, const char * window)
 {
+	imshow(WINDOW_DEPTH, img);
 	classification(img, classifiedMat, featureMatrix, decForest, bpDetector);
 	//imshow(window, img);
 	//imshow("Classified Image", classifiedMat);

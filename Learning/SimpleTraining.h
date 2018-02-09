@@ -1,3 +1,3 @@
 #include "DecTree.h"
 
-void startSimpleTraining(tree::Dataset* trData, int numTrData, tree::Node*& rootNode);
+void startSimpleTraining(tree::Record* trData, int numTrData, tree::Node*& rootNode);

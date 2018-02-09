@@ -12,15 +12,16 @@
 #include <fstream>
 #include <windows.h>
 #include <strsafe.h>
+#include <iostream>
 
 using std::string;
 using std::map;
 
 std::vector<string> getFilesInDirectory(string trDataFolder);
 std::vector<string> getUnifiedTrainingData(string trDataFolder);
-void readStrains(std::ifstream strainFile, map<int, ergonomics::Strains>& strainMap);
+void readStrains(std::ifstream& strainFile, map<int, ergonomics::Strains>& strainMap);
 
-int main(int argc, char** argv) {
+int main_ergo(int argc, char** argv) {
 	// needs to be done for WorldTransformation!!!
 	openni::Status statOpenNI;
 	printf("OpenNI initialization...\n");
@@ -60,38 +61,65 @@ int main(int argc, char** argv) {
 
 	printf("Start Creating knowledge.\n");
 
+	map<int,ergonomics::Strains> strains;
+	std::ifstream strainFile(tree::strainsFile());
+	readStrains(strainFile, strains);
+	strainFile.close();
+
+	std::ofstream knowledge(tree::knowledgeFile());
+
 	std::vector<string> images = getUnifiedTrainingData(tree::trainingFolder());
+	tree::Record** featureMatrix = new tree::Record*[MAX_ROW];
+	for (int i = 0; i < MAX_ROW; i++)
+		featureMatrix[i] = new tree::Record[MAX_COL];
+
+	std::vector<string> trees;
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_1.txt");
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_2.txt");
+	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_3.txt");
+	tree::DecisionForest decForest(trees);
+
+	tree::BodyPartDetector bpDetector = tree::BodyPartDetector(decForest);
+
+	int processed = 0;
+	int not_processed = 0;
 	
 	for (string image : images) {
 		string depStr = tree::depthImagesFolder() + image;
 		cv::Mat depImg = cv::imread(depStr, CV_LOAD_IMAGE_ANYDEPTH);
 
-		double min, max;
-		cv::minMaxIdx(depImg, &min, &max);
+		int imgNumber = atoi(image.substr(0, image.find_first_of('.')).c_str());
+		bool isSubject = false;
+		if (imgNumber >= 49 && imgNumber <= 146) {
+			printf("Skip Image %d\n", imgNumber);
+			continue;
+		}
 
-		printf("Min = %lf, Max = %lf\n", min, max);
+		map<int, ergonomics::Strains>::iterator it = strains.find(imgNumber);
+		if (it == strains.end()) {
+			not_processed++;
+			printf("Strains for Image<%3d> were not found!\n", imgNumber);
+			continue;
+		}
 
-		std::vector<string> trees;
-		trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_1.txt");
-		trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_2.txt");
-		trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_3.txt");
-		tree::DecisionForest decForest(trees);
+		tree::BodyPartLocations locs = bpDetector.getBodyPartLocations(depImg, isSubject);
 
-		tree::BodyPartDetector bpDetector = tree::BodyPartDetector(decForest);
+		ergonomics::Dataset dataset;
+		dataset.mm = ergonomics::ErgonomicEvaluation::getInstance().classify(locs);
+		dataset.strains = it->second;
 
-		cv::Mat classifiedMat;
-		classifiedMat.create(MAX_ROW, MAX_COL, CV_8UC3);
+		knowledge << dataset.toString() << std::endl;
 
-		tree::Dataset** featureMatrix = new tree::Dataset*[MAX_ROW];
-		for (int i = 0; i < MAX_ROW; i++)
-			featureMatrix[i] = new tree::Dataset[MAX_COL];
-
-		cv::Mat img;
-		tree::BodyPartLocations locs = bpDetector.getBodyPartLocations(img);
-		ergonomics::ErgonomicEvaluation::getInstance().classify(locs);
+		processed++;
 	}
 	
-	
+	knowledge.close();
+
+	puts("Finished successfully");
+	printf("Processed: %d, Not processed: %d\n", processed, not_processed);
+
+	string strin;
+	std::cin >> strin;
 
 	return 0;
 }
@@ -165,14 +193,16 @@ std::vector<string> getUnifiedTrainingData(string trDataFolder)
 	return trdata;
 }
 
-void readStrains(std::ifstream strainFile, map<int, ergonomics::Strains>& strainMap) {
+void readStrains(std::ifstream& strainFile, map<int, ergonomics::Strains>& strainMap) {
 	string line;
 
 	while (strainFile >> line) {
-		int posSem = line.find(';', 0);
-		int image = atoi(line.substr(0, posSem - 1).c_str());
+		size_t posSem = line.find(';', 0);
+		int image = atoi(line.substr(0, posSem).c_str());
 		ergonomics::Strains str;
-		str.ofString(line.substr(posSem + 1, line.length() - posSem - 2));
+		str.ofString(line.substr(posSem + 1, line.length() - posSem - 1));
 		strainMap.insert(std::pair<int, ergonomics::Strains>(image, str));
 	}
+
+	printf("Finished readStrains()\n");
 }

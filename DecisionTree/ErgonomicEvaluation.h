@@ -3,6 +3,7 @@
 #include "opencv2\opencv.hpp"
 #include <string>
 #include <sstream>
+#include <vector>
 
 #define MM_DIST_HEAD_TO_L_SHOULDER 0
 #define MM_DIST_HEAD_TO_R_SHOULDER 1
@@ -70,7 +71,7 @@ namespace ergonomics {
 			}
 
 			int num_measurements_found = 0;
-			int num;
+			double num;
 			while (ss >> num) {
 				vals[num_measurements_found++] = num;
 			}
@@ -92,7 +93,7 @@ namespace ergonomics {
 					ss << "P(";
 				}
 				else {
-					ss << ", P(";
+					ss << ",P(";
 				}
 				ss << strains[area][0];
 				for (int vals = 1; vals < ERG_VALIDATION_TOTAL_NUM; vals++) {
@@ -101,6 +102,8 @@ namespace ergonomics {
 				ss << ")";
 			}
 			ss << ")";
+
+			return ss.str();
 		}
 
 		void ofString(std::string s) {
@@ -121,12 +124,60 @@ namespace ergonomics {
 					val = 0;
 				}
 
-				if ((int) ch >= (int)'0' && (int)ch <= (int)'2') {
+				if (ch == '0' || ch == '1' || ch == '2') {
 					strains[parts - 1][val] = Strain(atoi(&ch));
+					val++;
 				}
 			}
 		}
 	} Strains;
+
+	class TotalStrain {
+	private:
+		int total_strains[ERG_AREA_TOTAL_NUM][ERG_VALIDATION_TOTAL_NUM];
+
+	public:
+		TotalStrain() {
+			for (int a = 0; a < ERG_AREA_TOTAL_NUM; a++) {
+				for (int v = 0; v < ERG_VALIDATION_TOTAL_NUM; v++) {
+					total_strains[a][v] = 0;
+				}
+			}
+		}
+		void addStrain(Strains strain) {
+			for (int area = 0; area < ERG_AREA_TOTAL_NUM; area++) {
+				for (int vals = 0; vals < ERG_VALIDATION_TOTAL_NUM; vals++) {
+					total_strains[area][vals] += strain.strains[area][vals];
+				}
+			}
+		}
+		std::string toString() {
+			std::stringstream ss;
+			ss << "TotalStrain(";
+
+			for (int area = 0; area < ERG_AREA_TOTAL_NUM; area++) {
+				if (area == 0) {
+					ss << "P(";
+				}
+				else {
+					ss << ",P(";
+				}
+				ss << total_strains[area][0];
+				for (int vals = 1; vals < ERG_VALIDATION_TOTAL_NUM; vals++) {
+					ss << "," << total_strains[area][vals];
+				}
+				ss << ")";
+			}
+			ss << ")";
+
+			return ss.str();
+		}
+	};
+
+	typedef struct MeasurementsDist {
+		double dist;
+		Strains strains;
+	} MeasurementsDist;
 
 	typedef struct Dataset {
 		Measurements mm;
@@ -142,9 +193,9 @@ namespace ergonomics {
 			}
 
 			std::string str = s.substr(3, s.length() - 4);
-			int posSemic = str.find(';', 0);
-			std::string sMM = str.substr(0, posSemic - 1);
-			std::string sSTR = str.substr(posSemic + 1, str.length() - posSemic - 2);
+			size_t posSemic = str.find(';', 0);
+			std::string sMM = str.substr(0, posSemic);
+			std::string sSTR = str.substr(posSemic + 1, str.length() - posSemic - 1);
 
 			mm.ofString(sMM);
 			strains.ofString(sSTR);
@@ -156,6 +207,9 @@ namespace ergonomics {
 		static ErgonomicEvaluation* instance;
 		float counters[NUM_AREAS_OF_INTEREST][NUM_COUNTERS_PER_AREA];
 		double distance(cv::Point3d p1, cv::Point3d p2);
+		std::vector<ergonomics::Dataset> knowledge;
+
+		double euclidDist(Measurements mm1, Measurements mm2);
 	public:
 		ErgonomicEvaluation();
 		~ErgonomicEvaluation();

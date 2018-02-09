@@ -4,4 +4,4 @@
 #include "DecTree.h"
 #include "CPUTrainingInterface.h"
 
-void startParallelTraining(tree::Dataset* trData, const unsigned int numTrData, tree::Node*& rootNode);
+void startParallelTraining(tree::Record* trData, const unsigned int numTrData, tree::Node*& rootNode);

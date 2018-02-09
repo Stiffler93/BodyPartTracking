@@ -9,9 +9,9 @@ using std::vector;
 
 tree::BodyPartDetector::BodyPartDetector()
 {
-	featureMatrix = new tree::Dataset*[MAX_ROW];
+	featureMatrix = new tree::Record*[MAX_ROW];
 	for (int i = 0; i < MAX_ROW; i++)
-		featureMatrix[i] = new tree::Dataset[MAX_COL];
+		featureMatrix[i] = new tree::Record[MAX_COL];
 
 	for (int i = 0; i < LOC_NUMBER; i++) {
 		BodyPartLocation loc;
@@ -23,9 +23,9 @@ tree::BodyPartDetector::BodyPartDetector()
 
 BodyPartDetector::BodyPartDetector(tree::DecisionForest & decForest) : decForest(decForest)
 {
-	featureMatrix = new tree::Dataset*[MAX_ROW];
+	featureMatrix = new tree::Record*[MAX_ROW];
 	for (int i = 0; i < MAX_ROW; i++)
-		featureMatrix[i] = new tree::Dataset[MAX_COL];
+		featureMatrix[i] = new tree::Record[MAX_COL];
 
 	for (int i = 0; i < LOC_NUMBER; i++) {
 		BodyPartLocation loc;
@@ -42,19 +42,19 @@ BodyPartDetector::~BodyPartDetector()
 	//delete[] featureMatrix;
 }
 
-BodyPartLocations BodyPartDetector::getBodyPartLocations(cv::Mat & subject)
+BodyPartLocations BodyPartDetector::getBodyPartLocations(cv::Mat & subject, bool isSubject)
 {
 	Mat classifiedMat;
 	classifiedMat.create(subject.rows, subject.cols, CV_8UC3);
 
 	classifiedMat = Scalar(Vec3b(127, 127, 127));
 
-	featurizeImage(subject, featureMatrix);
+	featurizeImage(subject, featureMatrix, isSubject);
 	Vec3b color;
 
 	for (int row = 0; row < MAX_ROW; row++) {
 		for (int col = 0; col < MAX_COL; col++) {
-			tree::Dataset set = featureMatrix[row][col];
+			tree::Record set = featureMatrix[row][col];
 
 			if (set.outcome == OTHER) {
 				string outcome = decForest.classify(set);
@@ -65,7 +65,7 @@ BodyPartLocations BodyPartDetector::getBodyPartLocations(cv::Mat & subject)
 		}
 	}
 
-	cv::imshow("Classified Mat", classifiedMat);
+	cv::imshow("Classified Pixels", classifiedMat);
 
 	int partCounter[LOC_NUMBER];
 	BodyPartLocation locations[LOC_NUMBER];

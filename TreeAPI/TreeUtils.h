@@ -11,9 +11,9 @@ void saveTree(tree::Node * tree, std::ofstream& file);
 
 void freeTree(tree::Node * node);
 
-void findResult(tree::Node* node, tree::Dataset test, std::vector<tree::Result>& results);
+void findResult(tree::Node* node, tree::Record test, std::vector<tree::Result>& results);
 
-bool getNextRecord(std::ifstream& dataset, tree::Dataset& record);
+bool getNextRecord(std::ifstream& dataset, tree::Record& record);
 
 void trace(std::string trace);
 

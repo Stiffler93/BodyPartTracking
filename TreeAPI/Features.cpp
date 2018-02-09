@@ -120,27 +120,27 @@ void getIntegral(cv::Mat & image, cv::Mat & integral)
 }
 
 string getCategory(int red, int green, int blue) {
-	if (red >= 250 && green <= 5 && blue <= 5) {
-		return LEFT_SHOULDER;
-	}
-
-	if (red <= 5 && green >= 250 && blue <= 5) {
-		return RIGHT_SHOULDER;
-	}
-
-	if (red <= 5 && green <= 5 && blue >= 250) {
+	if (red <= 5 && green <= 5 && blue >= 85 && blue <= 95) {
 		return HEAD;
 	}
 
-	if (red <= 5 && green <= 5 && blue <= 5) {
-		return STERNUM;
-	}
-
-	if (red <= 5 && green >= 250 && blue >= 250) {
+	if (red <= 5 && green >= 85 && green <= 95 && blue >= 85 && blue <= 95) {
 		return NECK;
 	}
 
-	if (red >= 250 && green >= 250 && blue >= 250) {
+	if (red <= 5 && green >= 85 && green <= 95 && blue <= 5) {
+		return LEFT_SHOULDER;
+	}
+
+	if (red >= 85 && red <= 95 && green <= 5 && blue <= 5) {
+		return RIGHT_SHOULDER;
+	}
+
+	if (red >= 85 && red <= 95 && green >= 85 && green <= 95 && blue <= 5) {
+		return NECK;
+	}
+
+	if (red >= 85 && red <= 95 && green >= 85 && green <= 95 && blue >= 85 && blue <= 95) {
 		return OTHER;
 	}
 
@@ -150,41 +150,42 @@ string getCategory(int red, int green, int blue) {
 Vec3b getBGR(string category)
 {
 	Vec3b color;
-	if (category == LEFT_SHOULDER) {
-		color[2] = 255;
-		color[1] = 0;
-		color[0] = 0;
-	}
-	else if (category == RIGHT_SHOULDER) {
-		color[2] = 0;
-		color[1] = 255;
-		color[0] = 0;
-	}
-	else if (category == STERNUM) {
+	if (category == HEAD) {
 		color[2] = 0;
 		color[1] = 0;
-		color[0] = 0;
-	}
-	else if (category == HEAD) {
-		color[2] = 0;
-		color[1] = 0;
-		color[0] = 255;
+		color[0] = 90;
 	}
 	else if (category == NECK) {
 		color[2] = 0;
-		color[1] = 255;
-		color[0] = 255;
+		color[1] = 90;
+		color[0] = 90;
+	}
+	else if (category == LEFT_SHOULDER) {
+		color[2] = 0;
+		color[1] = 90;
+		color[0] = 0;
+	}
+	else if (category == RIGHT_SHOULDER) {
+		color[2] = 90;
+		color[1] = 0;
+		color[0] = 0;
+	}
+	else if (category == STERNUM) {
+		color[2] = 90;
+		color[1] = 90;
+		color[0] = 0;
 	}
 	else if (category == OTHER) {
-		color[2] = 255;
-		color[1] = 255;
-		color[0] = 255;
+		color[2] = 90;
+		color[1] = 90;
+		color[0] = 90;
 	}
 	else {
 		color[2] = 127;
 		color[1] = 127;
 		color[0] = 127;
 	}
+
 	return color;
 }
 
@@ -745,7 +746,7 @@ void feature13(cv::Mat & subject, cv::Mat & feature13, int offset, cv::Mat & int
 	feature13.setTo(Scalar(MAX_VAL), subject == 0);
 }
 
-void featurizeImage(Mat& depImg, tree::Dataset**& featureMatrix) {
+void featurizeImage(Mat& depImg, tree::Record**& featureMatrix, bool isSubject) {
 
 	Mat feat1, feat2, feat3, feat4, feat5, feat6, feat7, feat8, feat9, feat10;
 	Mat feat11, feat12, feat13, feat14, feat15, feat16, feat17, feat18, feat19, feat20;
@@ -781,10 +782,14 @@ void featurizeImage(Mat& depImg, tree::Dataset**& featureMatrix) {
 	vertIntegral.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 	integral.create(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 
-	Mat subject = Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
-	getSubject(depImg, subject);
-
-	imshow("Subject", subject);
+	Mat subject;
+	if (isSubject) {
+		subject = depImg;
+	}
+	else {
+		subject = Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+		getSubject(depImg, subject);
+	}
 
 	getVerticalIntegral(subject, vertIntegral);
 	getHorizontalIntegral(subject, horizIntegral);
@@ -817,8 +822,8 @@ void featurizeImage(Mat& depImg, tree::Dataset**& featureMatrix) {
 	feature13(subject, feat25, 20, integral);
 	feature13(subject, feat26, 50, integral);
 
-	tree::Dataset set;
-	for(int row = 0; row < MAX_ROW; row++) 
+	tree::Record set;
+	for (int row = 0; row < MAX_ROW; row++) {
 		for (int col = 0; col < MAX_COL; col++) {
 			if (subject.at<ushort>(row, col) == 0) {
 				set.outcome = NONE;
@@ -855,4 +860,5 @@ void featurizeImage(Mat& depImg, tree::Dataset**& featureMatrix) {
 
 			featureMatrix[row][col] = set;
 		}
+	}
 }

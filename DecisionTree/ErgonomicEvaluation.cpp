@@ -1,5 +1,6 @@
 #include "ErgonomicEvaluation.h"
 #include "3DWorldTransformations.h"
+#include <fstream>
 
 using namespace tree;
 using namespace cv;
@@ -15,6 +16,16 @@ double ergonomics::ErgonomicEvaluation::distance(cv::Point3d p1, cv::Point3d p2)
 	return sqrt(pow(xDist, 2) + pow(yDist, 2) + pow(zDist, 2));
 }
 
+double ergonomics::ErgonomicEvaluation::euclidDist(Measurements mm1, Measurements mm2)
+{
+	double sum = 0;
+	for (int i = 0; i < MM_TOTAL_NUM; i++) {
+		sum += pow(mm1.vals[i] - mm2.vals[i], 2);
+	}
+
+	return sqrt(sum);
+}
+
 ergonomics::ErgonomicEvaluation::ErgonomicEvaluation()
 {
 	for (int area = 0; area < NUM_AREAS_OF_INTEREST; area++) {
@@ -22,6 +33,17 @@ ergonomics::ErgonomicEvaluation::ErgonomicEvaluation()
 			counters[area][counter] = 100;
 		}
 	}
+
+	std::ifstream knowledgeFile(tree::knowledgeFile());
+	std::string s;
+
+	while (knowledgeFile >> s) {
+		ergonomics::Dataset set;
+		set.ofString(s);
+		knowledge.push_back(set);
+	}
+	
+	knowledgeFile.close();
 }
 
 ergonomics::ErgonomicEvaluation::~ErgonomicEvaluation()
@@ -30,9 +52,43 @@ ergonomics::ErgonomicEvaluation::~ErgonomicEvaluation()
 
 void ergonomics::ErgonomicEvaluation::process(tree::BodyPartLocations bpLocs)
 {
+	Measurements mm = classify(bpLocs);
+	std::vector<MeasurementsDist> closest;
+	std::vector<MeasurementsDist>::iterator it;
+	int count = 0;
+
+	for (Dataset s: knowledge) {
+		double dist = euclidDist(mm, s.mm);
+		it = closest.begin();
+		count = 0;
+
+		for (; it != closest.end(); ++it, count++) {
+			if (dist < it->dist || count >= BPT_KNN_NUM_NEIGHBORS)
+				break;
+		}
+
+		if (count < BPT_KNN_NUM_NEIGHBORS) {
+			MeasurementsDist mmDist;
+			mmDist.dist = dist;
+			mmDist.strains = s.strains;
+			closest.insert(it, mmDist);
+		}
+	}
+
+	// now use k-NN algorithm
+	TotalStrain totalStrain;
+
+	for (int i = 0; i < closest.size(); i++) {
+		if (i >= BPT_KNN_NUM_NEIGHBORS)
+			break;
+
+		totalStrain.addStrain(closest.at(i).strains);
+	}
+
+	printf("%s\r", totalStrain.toString().c_str());
 }
 
-Measurements ergonomics::ErgonomicEvaluation::classify(tree::BodyPartLocations bpLocs)
+ergonomics::Measurements ergonomics::ErgonomicEvaluation::classify(tree::BodyPartLocations bpLocs)
 {
 	world::CoordinateTransformator* transformator = world::CoordinateTransformator::getInstance();
 
@@ -41,7 +97,6 @@ Measurements ergonomics::ErgonomicEvaluation::classify(tree::BodyPartLocations b
 	for (int i = 0; i < LOC_NUMBER; i++) {
 		BodyPartLocation bpLoc = bpLocs.locs[i];
 		loc3D[i] = transformator->transformToWorldSpace(bpLoc.row, bpLoc.col, bpLoc.depth);
-		//printf("loc3D[%d] = <%lf,%lf,%lf>\n", i, loc3D[i].x, loc3D[i].y, loc3D[i].z);
 	}
 
 	Measurements mm;
@@ -67,9 +122,5 @@ Measurements ergonomics::ErgonomicEvaluation::classify(tree::BodyPartLocations b
 	mm.vals[MM_OFF_DEP_L_SHOULDER_TO_STERNUM] = loc3D[LOC_L_SHOULDER].z - loc3D[LOC_STERNUM].z;
 	mm.vals[MM_OFF_DEP_R_SHOULDER_TO_STERNUM] = loc3D[LOC_R_SHOULDER].z - loc3D[LOC_STERNUM].z;
 
-	//printf("%s\r", mm.toString().c_str());
-	//printf("Dist_H-LS = %3.5lf\r", distance_head_to_left_shoulder);
-	//printf("Head_Vertical_Alignment = %3.5lf\r", mm.vals[MM_DIST_HEAD_TO_L_SHOULDER] - mm.vals[MM_DIST_HEAD_TO_R_SHOULDER]);
-	
 	return mm;
 }

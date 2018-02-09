@@ -15,9 +15,9 @@ using std::to_string;
 
 bool checkTreeFile(string outputfile);
 bool checkTrainingInput(string inputfile);
-void readTrainingData(string inputfile, Dataset* trData, int* numTrData, Dataset* testData, int* numTestData);
+void readTrainingData(string inputfile, Record* trData, int* numTrData, Record* testData, int* numTestData);
 
-void test(Dataset test, Node* decisionTree);
+void test(Record test, Node* decisionTree);
 
 int main(int argc, char** argv) 
 {
@@ -26,17 +26,21 @@ int main(int argc, char** argv)
 
 	if (!checkTreeFile(treeFile())) {
 		printf("Exit Training Program.\n");
+		string c;
+		std::cin >> c;
 		return 2;
 	}
 	
-	if (!checkTrainingInput(datasetFile())) {
-		printf("Exit Training Program.\n");
-		return 3;
-	}
+	//if (!checkTrainingInput(datasetFile())) {
+	//	printf("Exit Training Program.\n");
+	//	string b;
+	//	std::cin >> b;
+	//	return 3;
+	//}
 
 	const int numDS = numDatasets();
-	Dataset *trData = new Dataset[numDS];
-	Dataset *testData = new Dataset[numDS];
+	Record *trData = new Record[numDS];
+	Record *testData = new Record[numDS];
 	int numTrData = 0, numTestData = 0;
 
 	readTrainingData(datasetFile(), trData, &numTrData, testData, &numTestData);
@@ -134,13 +138,13 @@ bool checkTrainingInput(string inputfile)
 	return true;
 }
 
-void readTrainingData(string inputfile, Dataset* trData, int* numTrData, Dataset* testData, int* numTestData)
+void readTrainingData(string inputfile, Record* trData, int* numTrData, Record* testData, int* numTestData)
 {
 	trace("readTrainingData()");
 	srand(time(0));
 
 	double randNum = 0;
-	tree::Dataset record;
+	tree::Record record;
 
 	std::ifstream trDataset(inputfile);
 	while (*numTrData + *numTestData < numDatasets() && getNextRecord(trDataset, record)) {
@@ -159,7 +163,7 @@ void readTrainingData(string inputfile, Dataset* trData, int* numTrData, Dataset
 	trace("Parsed input training data.");
 }
 
-void test(Dataset test, Node * decisionTree)
+void test(Record test, Node * decisionTree)
 {
 	trace("Test for " + test.outcome + " with values: >" + to_string(test.feature[0]) + "," + to_string(test.feature[1]) + "," + to_string(test.feature[2]) + "<");
 

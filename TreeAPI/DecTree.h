@@ -6,10 +6,11 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <iomanip>
 
 namespace tree {
 
-typedef struct Dataset {
+typedef struct Record {
 	short feature[BPT_NUM_FEATURES]; // think about a better way to use numFeatures()
 	std::string outcome;
 
@@ -21,10 +22,14 @@ typedef struct Dataset {
 
 		return arr;
 	};
+	// may optimize with sprintf()
 	std::string toString() {
 		std::stringstream ss;
-		for (int i = 0; i < numFeatures(); i++)
+		for (int i = 0; i < numFeatures(); i++) {
+			ss.fill('0');
+			ss.width(4);
 			ss << feature[i] << " ";
+		}
 		ss << categoryToValue(outcome);
 		return ss.str();
 	};
@@ -41,7 +46,7 @@ typedef struct Result {
 } Result;
 
 typedef struct Partition {
-	Dataset *true_branch, *false_branch;
+	Record *true_branch, *false_branch;
 	int true_branch_size = 0, false_branch_size = 0;
 } Partition;
 
@@ -49,7 +54,7 @@ class Decision {
 public:
 	Decision();
 	Decision(int ref, int feat);
-	bool decide(Dataset trData);
+	bool decide(Record trData);
 	int refVal, feature;
 };
 

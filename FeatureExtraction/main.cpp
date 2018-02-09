@@ -74,6 +74,11 @@ int main(int argc, char** argv)
 
 	std::ofstream features(tree::datasetFile());
 
+	srand(time(0));
+	double randNum;
+
+	uint64 recordNum = 0;
+
 	for (string image : trData) {
 
 		printf("Handle image %s\n", image.c_str());
@@ -84,17 +89,26 @@ int main(int argc, char** argv)
 		string depStr = tree::depthImagesFolder() + image;
 		cv::Mat depImg = cv::imread(depStr, CV_LOAD_IMAGE_ANYDEPTH);
 
-		cv::Mat subject;
+		cv::Mat subject = cv::Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
 		
 		int imgNumber = atoi(image.substr(0, image.find_first_of('.')).c_str());
+		getSubject(depImg, subject);
 		
-		if (imgNumber < 49 || imgNumber > 146) {
-			subject = cv::Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
-			getSubject(depImg, subject);
-		}
-		else {
-			subject = depImg;
-		}
+		//if (imgNumber < 49 || imgNumber > 146) {
+		//	subject = cv::Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+		//	getSubject(depImg, subject);
+		//}
+		//else {
+		//	subject = depImg;
+		//}
+
+		//int key = 0;
+		//while (key != 27) {
+		//	cv::imshow("ColImg", colImg);
+		//	cv::imshow("DepImg", depImg);
+		//	cv::imshow("Subject", subject);
+		//	key = cv::waitKey(50);
+		//}
 
 		getVerticalIntegral(subject, vertIntegral);
 		getHorizontalIntegral(subject, horizIntegral);
@@ -128,7 +142,7 @@ int main(int argc, char** argv)
 		feature13(subject, feat26, 50, integral);
 
 		size_t numDatasets = 0;
-		tree::Dataset set;
+		tree::Record set;
 		cv::Vec3b colors;
 
 		for (int row = 0; row < MAX_ROW; row++) {
@@ -141,6 +155,20 @@ int main(int argc, char** argv)
 
 				if (set.outcome == NONE)
 					continue;
+
+				// reduce pixels by half
+				randNum = (double)rand() / (double)RAND_MAX;
+				if (randNum >= 0.5) {
+					continue;
+				}
+
+				// OTHER pixels are relatively the most pixels, so reduce them further
+				if (set.outcome == OTHER) {
+					randNum = (double)rand() / (double)RAND_MAX;
+					if (randNum >= 0.80) {
+						continue;
+					}
+				}
 
 				set.feature[0] = feat1.at<ushort>(row, col);
 				set.feature[1] = feat2.at<ushort>(row, col);
@@ -169,7 +197,9 @@ int main(int argc, char** argv)
 				set.feature[24] = feat25.at<ushort>(row, col);
 				set.feature[25] = feat26.at<ushort>(row, col);
 
-				features << set.toString() << std::endl;
+				features.width(12);
+				features.fill('0');
+				features << ++recordNum << set.toString() << std::endl;
 				numDatasets++;
 			}
 		}

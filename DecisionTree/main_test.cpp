@@ -15,93 +15,12 @@
 using std::string;
 using std::to_string;
 
-void classification(cv::Mat& image, cv::Mat& classifiedMat, tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector);
+void classification(cv::Mat& image, cv::Mat& classifiedMat, tree::Record**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector);
 void realTest(tree::DecisionForest& decForest);
 void testDecForestWithTrainingData(tree::DecisionForest& decForest);
 
-int main(int argc, char** argv) {
-	// needs to be done for WorldTransformation!!!
-	openni::Status statOpenNI;
-	printf("OpenNI initialization...\n");
-	statOpenNI = openni::OpenNI::initialize();
-	if (statOpenNI != openni::Status::STATUS_OK) {
-		puts("OpenNI initialization failed!");
-		return 1;
-	}
-
-	puts("Asus Xtion Pro initialization...");
-	openni::Device device;
-	if (device.open(openni::ANY_DEVICE) != 0)
-	{
-		puts("Device not found !");
-		puts("Abort test");
-		openni::OpenNI::shutdown();
-		return 1;
-	}
-	puts("Asus Xtion Pro opened");
-
-	openni::VideoStream depth;
-	depth.create(device, openni::SENSOR_DEPTH);
-	depth.start();
-
-	world::CoordinateTransformator* transformator = world::CoordinateTransformator::getInstance();
-	transformator->init(&depth);
-
-	openni::VideoMode paramvideo;
-	paramvideo.setResolution(MAX_COL, MAX_ROW);
-	paramvideo.setFps(FPS);
-	paramvideo.setPixelFormat(openni::PIXEL_FORMAT_DEPTH_100_UM);
-
-	depth.setVideoMode(paramvideo);
-	// needs to be done for WorldTransformation!!!
-
-
-
-	printf("Start Inspection of Images.\n");
-
-	string image = "027.png";
-
-	string colStr = tree::imagesFolder() + image;
-	cv::Mat colImg = cv::imread(colStr);
-	string depStr = tree::depthImagesFolder() + image;
-	cv::Mat depImg = cv::imread(depStr, CV_LOAD_IMAGE_ANYDEPTH);
-
-	printf("DepImg type = %d\n", depImg.type());
-
-	double min, max;
-	cv::minMaxIdx(depImg, &min, &max);
-
-	printf("Min = %lf, Max = %lf\n", min, max);
-
-	std::vector<string> trees;
-	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_1.txt");
-	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_2.txt");
-	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_3.txt");
-	tree::DecisionForest decForest(trees);
-
-	tree::BodyPartDetector bpDetector = tree::BodyPartDetector(decForest);
-
-	cv::Mat classifiedMat;
-	classifiedMat.create(MAX_ROW, MAX_COL, CV_8UC3);
-
-	tree::Dataset** featureMatrix = new tree::Dataset*[MAX_ROW];
-	for (int i = 0; i < MAX_ROW; i++)
-		featureMatrix[i] = new tree::Dataset[MAX_COL];
-
-	int key = 0;
-	while (key != 27) {
-		classification(depImg, classifiedMat, featureMatrix, decForest, bpDetector);
-		imshow("Depth Image", depImg);
-		//imshow("Classification", classifiedMat);
-		key = cv::waitKey(10);
-	}
-
-	return 0;
-}
-
-int main_main(int argc, char** argv) 
+int main(int argc, char** argv) 
 {
-	
 	printf("Start Decision Tree Test: \n");
 	std::vector<string> trees;
 	trees.push_back(tree::dataFolder() + "tree_straight_273_26_sub_1.txt");
@@ -184,11 +103,13 @@ void realTest(tree::DecisionForest& decForest)
 	printf("done.\n");
 }
 
-void classification(cv::Mat& image, cv::Mat& classifiedMat, tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector) {
+void classification(cv::Mat& image, cv::Mat& classifiedMat, tree::Record**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector) {
 	classifiedMat = 0;
 	
 	tree::BodyPartLocations locs = bpDetector.getBodyPartLocations(image);
-	ergonomics::ErgonomicEvaluation::getInstance().classify(locs);
+	//ergonomics::ErgonomicEvaluation::getInstance().classify(locs);
+	ergonomics::ErgonomicEvaluation::getInstance().process(locs);
+
 	//printf("BPT Status = %d\r", bpDetector.state());
 	//printf("Head<%d|%d>, Neck<%d|%d>, LShould<%d|%d>, RShould<%d|%d>, Sternum<%d|%d>\r", locs.locs[LOC_HEAD].col, locs.locs[LOC_HEAD].row,
 	//	locs.locs[LOC_NECK].col, locs.locs[LOC_NECK].row, locs.locs[LOC_L_SHOULDER].col, locs.locs[LOC_L_SHOULDER].row, locs.locs[LOC_R_SHOULDER].col, 
@@ -225,7 +146,7 @@ void testDecForestWithTrainingData(tree::DecisionForest& decForest) {
 
 	int total = 0, correctClass = 0, falseClass = 0;
 
-	tree::Dataset record;
+	tree::Record record;
 	while(getNextRecord(features, record)) {
 		total++;
 

@@ -13,7 +13,7 @@ namespace tree {
 	public:
 		DecisionForest();
 		DecisionForest(std::vector<std::string> treeFiles);
-		std::string classify(Dataset set);
+		std::string classify(Record set);
 		void parseTree(std::string tree);
 	};
 }

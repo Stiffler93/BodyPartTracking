@@ -69,7 +69,7 @@ cl::Kernel* kernel(cl::Context context, cl::Device device, string file, std::map
 	return k;
 }
 
-void trainingsLoop(Dataset * trData, const unsigned int numTrData, Node *& node, cl::Context& context, cl::Device& device, cl::CommandQueue& queue, unsigned long* numTrDataLeft, cl::Kernel* kernels, int cycle = 1) {
+void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, cl::Context& context, cl::Device& device, cl::CommandQueue& queue, unsigned long* numTrDataLeft, cl::Kernel* kernels, int cycle = 1) {
 	//std::printf("Call trainingsLoop(). numTrData = %d\n", numTrData);
 	std::printf("Tree Depth: %4d. numTrDataLeft: %10ld\r", cycle++, *numTrDataLeft);
 	
@@ -107,7 +107,7 @@ void trainingsLoop(Dataset * trData, const unsigned int numTrData, Node *& node,
 
 		trace("Create Dataset");
 
-		Dataset set;
+		Record set;
 		for (unsigned int i = 0, offset = 0; i < numTrData; i++, offset += datasetLength) {
 			set = trData[i];
 			unsigned short* arr = set.toArray();
@@ -362,8 +362,8 @@ void trainingsLoop(Dataset * trData, const unsigned int numTrData, Node *& node,
 	node = (Node*) new DecisionNode(split.decision);
 
 	Partition part;
-	part.true_branch = new Dataset[numTrData];
-	part.false_branch = new Dataset[numTrData];
+	part.true_branch = new Record[numTrData];
+	part.false_branch = new Record[numTrData];
 
 	partition(&part, trData, numTrData, split.decision);
 
@@ -376,7 +376,7 @@ void trainingsLoop(Dataset * trData, const unsigned int numTrData, Node *& node,
 		trainingsLoop(part.false_branch, part.false_branch_size, node->false_branch, context, device, queue, numTrDataLeft, kernels, cycle);
 }
 
-void startParallelTraining(Dataset * trData, const unsigned int numTrData, Node *& rootNode)
+void startParallelTraining(Record * trData, const unsigned int numTrData, Node *& rootNode)
 {
 	std::printf("Start Parallel Training.\n");
 	std::string s;

@@ -30,13 +30,13 @@ namespace tree {
 	private:
 		tree::DecisionForest decForest;
 		BodyPartLocation locs[LOC_NUMBER];
-		tree::Dataset** featureMatrix;
+		tree::Record** featureMatrix;
 		TrackingStatus status = UNTRACKED;
 	public:
 		BodyPartDetector();
 		BodyPartDetector(tree::DecisionForest& decForest);
 		~BodyPartDetector();
-		BodyPartLocations getBodyPartLocations(cv::Mat& subject);
+		BodyPartLocations getBodyPartLocations(cv::Mat& subject, bool isSubject = false);
 		TrackingStatus state();
 	};
 }

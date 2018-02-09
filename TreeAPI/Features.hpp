@@ -88,7 +88,7 @@ void feature12(cv::Mat& depImg, cv::Mat& feature12, int offset, cv::Mat& vertInt
 void feature13(cv::Mat& depImg, cv::Mat& feature13, int offset, cv::Mat& integral = cv::Mat());
 
 //Calculates all features for every pixel in the image and returns a matrix
-//which size matches the image size and contains a Dataset (=feature collection)
+//which size matches the image size and contains a Record (=feature collection)
 //in every index. The indices of the Datasets correspond with the indices of
 //the depending pixels.
-void featurizeImage(cv::Mat& depImg, tree::Dataset**& featureMatrix);
+void featurizeImage(cv::Mat& depImg, tree::Record**& featureMatrix, bool isSubject = false);

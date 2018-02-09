@@ -18,7 +18,7 @@ void testWithTrainingData(tree::Node * decisionTree)
 	std::vector<Result> results;
 
 	while (features >> feat1 >> feat2 >> feat3 >> feat4 >> feat5 >> feat6 >> feat7 >> feat8 >> feat9 >> feat10 >> category) {
-		Dataset set;
+		Record set;
 		set.feature[0] = feat1;
 		set.feature[1] = feat2;
 		set.feature[2] = feat3;
@@ -78,12 +78,12 @@ void testWithTrainingData(tree::Node * decisionTree)
 	std::printf("Correctly classified %lf percent.\n", (float)correctClass / (float)total * 100);
 }
 
-void testWithTestData(tree::Node * decisionTree, tree::Dataset * testData, int numTestData)
+void testWithTestData(tree::Node * decisionTree, tree::Record * testData, int numTestData)
 {
 	int correctClass = 0, falseClass = 0;
 
 	for (int i = 0; i < numTestData; i++) {
-		Dataset set = testData[i];
+		Record set = testData[i];
 		std::vector<Result> results;
 		findResult(decisionTree, set, results);
 

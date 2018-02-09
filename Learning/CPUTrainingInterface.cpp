@@ -5,7 +5,7 @@
 using namespace tree;
 using std::string;
 
-bool isPure(tree::Dataset* trData, int numTrData) {
+bool isPure(tree::Record* trData, int numTrData) {
 	string ref = trData[0].outcome;
 	for (int i = 1; i < numTrData; i++) {
 		string name = trData[i].outcome;
@@ -16,7 +16,7 @@ bool isPure(tree::Dataset* trData, int numTrData) {
 	return true;
 }
 
-float impurity(Dataset* trData, int numTrData) {
+float impurity(Record* trData, int numTrData) {
 	std::map<string, int> category_counts;
 
 	for (int i = 0; i < numTrData; i++) {
@@ -41,7 +41,7 @@ float impurity(Dataset* trData, int numTrData) {
 	return (float)impurity;
 }
 
-void partition(Partition* part, Dataset* trData, int numTrData, Decision decision) {
+void partition(Partition* part, Record* trData, int numTrData, Decision decision) {
 	part->false_branch_size = part->true_branch_size = 0;
 
 	for (int i = 0; i < numTrData; i++) {
@@ -73,7 +73,7 @@ float infoGain(Partition partition, float current_uncertainty) {
 	return infoGain;
 }
 
-UniqueValues calcUniqueVals(Dataset* trData, int numTrData, int feature) {
+UniqueValues calcUniqueVals(Record* trData, int numTrData, int feature) {
 	UniqueValues values;
 
 	for (int i = 0; i < numTrData; i++) {
@@ -100,13 +100,13 @@ UniqueValues calcUniqueVals(Dataset* trData, int numTrData, int feature) {
 	return values;
 }
 
-BestSplit findBestSplit(Dataset* trData, int numTrData) {
+BestSplit findBestSplit(Record* trData, int numTrData) {
 	float current_uncertainty = impurity(trData, numTrData);
 	BestSplit split;
 
 	Partition part;
-	part.true_branch = new Dataset[numTrData];
-	part.false_branch = new Dataset[numTrData];
+	part.true_branch = new Record[numTrData];
+	part.false_branch = new Record[numTrData];
 
 	int uniqueVal = 0;
 

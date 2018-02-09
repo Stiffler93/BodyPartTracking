@@ -19,7 +19,7 @@ namespace util {
 	{
 	public:
 		ImageRecorder(openni::Device& device, openni::VideoStream** streams, tree::DecisionForest& decForest, std::function<void(cv::Mat& img, cv::Mat& classifiedImg,
-			tree::Dataset**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector)> classification);
+			tree::Record**& featureMatrix, tree::DecisionForest& decForest, tree::BodyPartDetector& bpDetector)> classification);
 		~ImageRecorder();
 
 		void run();
@@ -30,7 +30,7 @@ namespace util {
 		openni::VideoFrameRef depthFrame;
 		cv::Mat depthMat;
 		cv::Mat classifiedMat;
-		tree::Dataset** featureMatrix;
+		tree::Record** featureMatrix;
 		tree::DecisionForest& decForest;
 		tree::BodyPartDetector bpDetector;
 

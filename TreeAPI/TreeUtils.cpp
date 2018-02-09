@@ -30,7 +30,7 @@ void freeTree(tree::Node * node) {
 	delete node;
 }
 
-void findResult(tree::Node* node, tree::Dataset test, std::vector<tree::Result>& results) {
+void findResult(tree::Node* node, tree::Record test, std::vector<tree::Result>& results) {
 	while (!node->isResult()) {
 		if (((tree::DecisionNode*)node)->dec.decide(test)) {
 			node = node->true_branch;
@@ -49,7 +49,7 @@ void findResult(tree::Node* node, tree::Dataset test, std::vector<tree::Result>&
 	}
 }
 
-bool getNextRecord(std::ifstream& dataset, tree::Dataset& record)
+bool getNextRecord(std::ifstream& dataset, tree::Record& record)
 {
 	std::string s;
 	std::getline(dataset, s);

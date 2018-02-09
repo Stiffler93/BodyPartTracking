@@ -14,7 +14,7 @@ tree::DecisionForest::DecisionForest(vector<string> treeFiles) {
 	}
 }
 
-string tree::DecisionForest::classify(Dataset set)
+string tree::DecisionForest::classify(Record set)
 {
 	std::map<string, double> overallResult;
 

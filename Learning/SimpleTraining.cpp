@@ -6,7 +6,7 @@
 using namespace tree;
 using std::string;
 
-void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* numTrDataLeft) {
+void buildTree(Node*& decNode, Record* trData, int numTrData, unsigned long* numTrDataLeft) {
 
 	float imp = impurity(trData, numTrData);
 
@@ -63,8 +63,8 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 	decNode = (Node*) new DecisionNode(split.decision);
 
 	Partition part;
-	part.true_branch = new Dataset[numTrData];
-	part.false_branch = new Dataset[numTrData];
+	part.true_branch = new Record[numTrData];
+	part.false_branch = new Record[numTrData];
 
 	partition(&part, trData, numTrData, split.decision);
 
@@ -77,7 +77,7 @@ void buildTree(Node*& decNode, Dataset* trData, int numTrData, unsigned long* nu
 		buildTree(decNode->false_branch, part.false_branch, part.false_branch_size, numTrDataLeft);
 }
 
-void startSimpleTraining(Dataset* trData, int numTrData, Node*& rootNode)
+void startSimpleTraining(Record* trData, int numTrData, Node*& rootNode)
 {
 	unsigned long numTrDataLeft = numTrData;
 	printf("NumTrDataLeft: %ld\n", numTrDataLeft);
