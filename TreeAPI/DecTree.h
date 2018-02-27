@@ -10,6 +10,34 @@
 
 namespace tree {
 
+typedef struct MetaData {
+	unsigned short type = 0;
+	unsigned int numRecords = 0;
+	void ofString(std::string s) {
+		std::stringstream ss;
+		ss << s;
+		ss >> s; // remove '##'
+		ss >> type;
+		ss >> numRecords;
+	}
+	std::string toString() {
+		std::stringstream ss;
+		ss << "## " << type << " " << numRecords;
+		return ss.str();
+	}
+} MetaData;
+
+typedef struct DatasetMetaData {
+	MetaData meta[NUM_META_DATA];
+	std::string toString() {
+		std::stringstream ss;
+		for (int i = 0; i < NUM_META_DATA; i++) {
+			ss << meta[i].toString() << std::endl;
+		}
+		return ss.str();
+	}
+} DatasetMetaData;
+
 typedef struct Record {
 	short feature[BPT_NUM_FEATURES]; // think about a better way to use numFeatures()
 	std::string outcome;

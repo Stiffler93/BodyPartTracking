@@ -1,6 +1,8 @@
 *.sln
 *.VC.db
 *.VC.VC.opendb
+Data
+Data/*
 Data/TrainingImages
 .vs
 x64

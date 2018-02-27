@@ -11,7 +11,7 @@ int tree::numFeatures() {
 }
 
 int tree::numDatasets() {
-	return BPT_NUM_DATASETS;
+	return BPT_NUM_RECORDS;
 }
 
 string tree::rootFolder() {
@@ -36,6 +36,16 @@ string tree::trainingFolder() {
 
 string tree::datasetFile() {
 	return dataFolder() + BPT_FILE_DATASET;
+}
+
+std::string tree::datasetFileOrdered()
+{
+	return dataFolder() + BPT_FILE_DATASET_ORDERED;
+}
+
+std::string tree::datasetFileMap()
+{
+	return dataFolder() + BPT_FILE_DATASET_MAP;
 }
 
 std::string tree::strainsFile()

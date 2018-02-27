@@ -78,6 +78,9 @@ int main(int argc, char** argv)
 	double randNum;
 
 	uint64 recordNum = 0;
+	tree::DatasetMetaData metaData;
+
+	size_t totalNumRecords = 0;
 
 	for (string image : trData) {
 
@@ -199,14 +202,20 @@ int main(int argc, char** argv)
 
 				features.width(12);
 				features.fill('0');
-				features << ++recordNum << set.toString() << std::endl;
+				features << ++recordNum << " " << set.toString() << std::endl;
 				numDatasets++;
+
+				metaData.meta[categoryToValue(set.outcome)].numRecords++;
 			}
 		}
 
+		totalNumRecords += numDatasets;
 		printf("Algorithm classified %zd pixels for Image %s.\n", numDatasets, image.c_str());
 		printf("\nFinished image %s.\n", image.c_str());
 	}
+
+	metaData.meta[NUM_META_DATA - 1].numRecords = totalNumRecords;
+	features << metaData.toString();
 
 	features.close();
 

@@ -5,6 +5,7 @@
 #include "Tests.h"
 #include "SimpleTraining.h"
 #include "ParallelTraining.h"
+#include "BoundlessTraining.h"
 #include "CategoryUtils.h"
 #include <iostream>
 #include <fstream>
@@ -19,7 +20,39 @@ void readTrainingData(string inputfile, Record* trData, int* numTrData, Record* 
 
 void test(Record test, Node* decisionTree);
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
+{
+	printf("Start.\n");
+
+	if (!checkTreeFile(treeFile())) {
+		printf("Exit Training Program.\n");
+		string c;
+		std::cin >> c;
+		return 2;
+	}
+
+	printf("Start Training? (y/n)\n");
+	string a;
+	std::cin >> a;
+
+	if (a != "y" && a != "Y")
+		return 0;
+
+	clock_t begin = clock();
+
+	Node* decisionTree = NULL;
+	startBoundlessTraining(tree::datasetFileOrdered(), tree::datasetFileMap(), decisionTree);
+
+	clock_t end = clock();
+	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+
+	printf("Training took %lf seconds!\n", elapsed_secs);
+
+	string b;
+	std::cin >> b;
+}
+
+int main_2(int argc, char** argv) 
 {
 	printf("Start.\n");
 	trace("Read training Data from folder " + datasetFile());
@@ -62,8 +95,8 @@ int main(int argc, char** argv)
 	clock_t begin = clock();
 
 	Node* decisionTree = NULL;
-	//startSimpleTraining(trData, numTrData, decisionTree);
-	startParallelTraining(trData, numTrData, decisionTree);
+	startSimpleTraining(trData, numTrData, decisionTree);
+	//startParallelTraining(trData, numTrData, decisionTree);
 
 	clock_t end = clock();
 	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
