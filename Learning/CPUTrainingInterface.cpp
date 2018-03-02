@@ -131,10 +131,15 @@ BestSplit findBestSplit(Record* trData, int numTrData) {
 
 			float gain = infoGain(part, current_uncertainty);
 			const int FACTOR = 1000000;
-			int newGain = (int)(gain * FACTOR);
-			int oldGain = (int)(split.gain * FACTOR);
+			//int newGain = (int)(gain * FACTOR);
+			//int oldGain = (int)(split.gain * FACTOR);
 
-			if (/*gain > split.gain*/newGain > oldGain) {
+			//if (/*gain > split.gain*/newGain > oldGain) {
+			//	split.gain = gain;
+			//	split.decision = dec;
+			//}
+
+			if (gain > split.gain) {
 				split.gain = gain;
 				split.decision = dec;
 			}

@@ -7,7 +7,7 @@ namespace tree {
 
 	const static int BPT_NUM_FEATURES = 26;
 	const static bool BPT_TRACE = true;
-	const static int BPT_NUM_RECORDS = 1000;
+	const static int BPT_NUM_RECORDS = /*20; // */50000;
 	// only temporary!!
 	const static int BPT_NUM_CATEGORY_1 = 0;
 	const static int BPT_NUM_CATEGORY_2 = 0;
@@ -34,9 +34,9 @@ namespace tree {
 	const static std::string BPT_FOLDER_FEATURES = "features\\";
 	const static std::string BPT_FILE_TREE = "tree.txt";
 	const static std::string BPT_FILE_DEBUG = "debug.txt";
-	const static std::string BPT_FILE_DATASET = "dataset_synthetic.test";
-	const static std::string BPT_FILE_DATASET_ORDERED = "dataset_synthetic.test_ordered";
-	const static std::string BPT_FILE_DATASET_MAP = "dataset_synthetic.test_map";
+	const static std::string BPT_FILE_DATASET = /*"dataset_test.txt";//*/"dataset_synthetic.test2";
+	const static std::string BPT_FILE_DATASET_ORDERED = /*"dataset_test.txt_ordered"; // */"dataset_synthetic.test2_ordered";
+	const static std::string BPT_FILE_DATASET_MAP = /*"dataset_test.txt_map"; // */"dataset_synthetic.test2_map";
 	const static std::string BPT_FILE_STRAINS = "strains.txt";
 	const static std::string BPT_FILE_MEASUREMENTS = "measurements.txt";
 	const static std::string BPT_FILE_KNOWLEDGE = "knowledge.txt";

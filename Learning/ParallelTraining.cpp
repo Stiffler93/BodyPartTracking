@@ -87,7 +87,7 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 		if (imp > BPT_STOP_EVALUATION_IMPURITY)
 			split = findBestSplit(trData, numTrData);
 	} 
-	else if(numTrData > BPT_STOP_EVALUATION_LIMIT) {	// calculation on GPU
+	else if(true /*numTrData > BPT_STOP_EVALUATION_LIMIT*/) {	// calculation on GPU
 		trace("GPU calculation");
 		cl_int err = 0;
 		const int NUM_VALS_PER_FEATURE = NORM_FACTOR + 1;
@@ -165,7 +165,7 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 			std::printf("Impurity >%lf< is wrong! Exit program!\n", imp);
 		}
 
-		if (imp > BPT_STOP_EVALUATION_IMPURITY) {
+		if (true /*imp > BPT_STOP_EVALUATION_IMPURITY*/) {
 			trace("Calc unique Vals");
 
 			cl::Buffer* unique_vals_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(unsigned char) * NUM_VALS_PER_FEATURE * numFeatures(), NULL, &err);
@@ -310,7 +310,7 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 		delete temp_values_buffer;
 	}
 
-	if (imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || split.gain == 0) {
+	if (/*imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || */split.gain == 0) {
 		trace("Create ResultNode");
 		if (numTrData == 1 || imp == 0) {
 			Result res;

@@ -8,6 +8,7 @@ std::string categoryOfValue(int category) {
 	case 3: return NECK;
 	case 4: return STERNUM;
 	case 5: return OTHER;
+	default: return NONE;
 	}
 }
 
@@ -29,4 +30,6 @@ short categoryToValue(std::string category) {
 
 	if (category == OTHER)
 		return 5;
+
+	return 99;
 }

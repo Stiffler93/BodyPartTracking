@@ -1,6 +1,7 @@
 #include "TreeUtils.h"
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 void printTree(tree::Node * node)
 {
@@ -28,6 +29,19 @@ void freeTree(tree::Node * node) {
 		freeTree(node->false_branch);
 
 	delete node;
+}
+
+int treeDepth(tree::Node * node)
+{
+	int trueDepth = 0, falseDepth = 0;
+
+	if (node->true_branch != NULL)
+		trueDepth = treeDepth(node->true_branch);
+
+	if (node->false_branch != NULL)
+		falseDepth = treeDepth(node->false_branch);
+
+	return std::max(trueDepth, falseDepth) + 1;
 }
 
 void findResult(tree::Node* node, tree::Record test, std::vector<tree::Result>& results) {

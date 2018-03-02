@@ -2,6 +2,7 @@
 #include "CategoryUtils.h"
 #include "CPUTrainingInterface.h"
 #include <map>
+#include "TreeUtils.h"
 
 using namespace tree;
 using std::string;
@@ -14,7 +15,7 @@ void buildTree(Node*& decNode, Record* trData, int numTrData, unsigned long* num
 	if(imp > BPT_STOP_EVALUATION_IMPURITY)
 		split = findBestSplit(trData, numTrData);
 
-	if (imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || split.gain == 0) {
+	if (/*imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || */split.gain == 0) {
 		if (numTrData == 1 || isPure(trData, numTrData)) {
 			Result res;
 			res.outcome = trData[0].outcome;
@@ -67,6 +68,9 @@ void buildTree(Node*& decNode, Record* trData, int numTrData, unsigned long* num
 	part.false_branch = new Record[numTrData];
 
 	partition(&part, trData, numTrData, split.decision);
+
+	trace("Decision >" + std::to_string(split.decision.feature) + "|" + std::to_string(split.decision.refVal) + "<");
+	trace("False_Branch_size = " + std::to_string(part.false_branch_size) + ", True_Branch_size = " + std::to_string(part.true_branch_size));
 
 	delete[] trData;
 

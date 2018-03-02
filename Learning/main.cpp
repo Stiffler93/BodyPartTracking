@@ -41,7 +41,7 @@ int main(int argc, char** argv)
 	clock_t begin = clock();
 
 	Node* decisionTree = NULL;
-	startBoundlessTraining(tree::datasetFileOrdered(), tree::datasetFileMap(), decisionTree);
+	startBoundlessTraining(tree::datasetFileOrdered(), tree::datasetFileMap(), &decisionTree);
 
 	clock_t end = clock();
 	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
@@ -50,9 +50,30 @@ int main(int argc, char** argv)
 
 	string b;
 	std::cin >> b;
+
+	testWithTrainingData(decisionTree);
+
+	int depth = treeDepth(decisionTree);
+	trace("Depth of Tree is: " + to_string(depth));
+	printf("Depth of Tree is: %d\n", depth);
+
+	trace("Write training results to " + treeFile());
+	//printTree(decisionTree);
+
+	std::ofstream tree_file(treeFile());
+	saveTree(decisionTree, tree_file);
+	tree_file.close();
+
+	freeTree(decisionTree);
+
+	printf("SUCCESSFULLY built DECISION TREE\n");
+	string c;
+	std::cin >> c;
+
+	return 0;
 }
 
-int main_2(int argc, char** argv) 
+int main2(int argc, char** argv) 
 {
 	printf("Start.\n");
 	trace("Read training Data from folder " + datasetFile());
@@ -106,11 +127,14 @@ int main_2(int argc, char** argv)
 	string b; 
 	std::cin >> b;
 
-	//testWithTrainingData(decisionTree);
-	testWithTestData(decisionTree, testData, numTestData);
+	testWithTrainingData(decisionTree);
+	//testWithTestData(decisionTree, testData, numTestData);
 
 	trace("Write training results to " + treeFile());
 	//printTree(decisionTree);
+	int depth = treeDepth(decisionTree);
+	trace("Depth of Tree is: " + to_string(depth));
+	printf("Depth of Tree is: %d\n", depth);
 
 	std::ofstream tree_file(treeFile());
 	saveTree(decisionTree, tree_file);

@@ -47,7 +47,7 @@ tree::Decision::Decision() : Decision(0, 0) {};
 tree::Decision::Decision(int ref, int feat) : refVal(ref), feature(feat) {};
 
 bool tree::Decision::decide(Record trData) {
-	return trData.feature[feature] < refVal;
+	return trData.feature[feature] <= refVal;
 }
 
 void tree::decisionNode(std::vector<tree::NodeRefs>& noderefs, string data)
