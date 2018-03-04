@@ -12,7 +12,7 @@ void buildTree(Node*& decNode, Record* trData, int numTrData, unsigned long* num
 	float imp = impurity(trData, numTrData);
 
 	BestSplit split;
-	if(imp > BPT_STOP_EVALUATION_IMPURITY)
+	//if(imp > BPT_STOP_EVALUATION_IMPURITY)
 		split = findBestSplit(trData, numTrData);
 
 	if (/*imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || */split.gain == 0) {

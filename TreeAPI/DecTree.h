@@ -99,6 +99,7 @@ enum NodeType {
 
 class Node {
 public:
+	static int numOfNodes;
 	Node(NodeType type);
 	bool isResult() { return type == RESULT; }
 	Node* false_branch, *true_branch;
@@ -106,7 +107,6 @@ public:
 	int getNum() { return numNode; }
 protected:
 	NodeType type;
-	static int numOfNodes;
 	int numNode;
 };
 

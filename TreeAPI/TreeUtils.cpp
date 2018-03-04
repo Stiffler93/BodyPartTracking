@@ -44,6 +44,38 @@ int treeDepth(tree::Node * node)
 	return std::max(trueDepth, falseDepth) + 1;
 }
 
+void normTree(tree::Node * origTree, tree::Node * normalizedTree) 
+{
+	if (origTree->true_branch != NULL) {
+		if (origTree->true_branch->isResult()) {
+			normalizedTree->true_branch = (tree::Node*) new tree::ResultNode(((tree::ResultNode*) origTree->true_branch)->result);
+		}
+		else {
+			normalizedTree->true_branch = (tree::Node*) new tree::DecisionNode(((tree::DecisionNode*) origTree->true_branch)->dec);
+			normTree(origTree->true_branch, normalizedTree->true_branch);
+		}
+	}
+
+	if (origTree->false_branch != NULL) {
+		if (origTree->false_branch->isResult()) {
+			normalizedTree->false_branch = (tree::Node*) new tree::ResultNode(((tree::ResultNode*) origTree->false_branch)->result);
+		}
+		else {
+			normalizedTree->false_branch = (tree::Node*) new tree::DecisionNode(((tree::DecisionNode*) origTree->false_branch)->dec);
+			normTree(origTree->false_branch, normalizedTree->false_branch);
+		}
+	}
+}
+
+void normalizeTree(tree::Node*& origTree, tree::Node*& normalizedTree)
+{
+	if (origTree != NULL) {
+		tree::Node::numOfNodes = 0;
+		normalizedTree = (tree::Node*) new tree::DecisionNode(((tree::DecisionNode*) origTree)->dec);
+		normTree(origTree, normalizedTree);
+	}
+}
+
 void findResult(tree::Node* node, tree::Record test, std::vector<tree::Result>& results) {
 	while (!node->isResult()) {
 		if (((tree::DecisionNode*)node)->dec.decide(test)) {

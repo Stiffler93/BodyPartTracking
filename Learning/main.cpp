@@ -20,7 +20,7 @@ void readTrainingData(string inputfile, Record* trData, int* numTrData, Record* 
 
 void test(Record test, Node* decisionTree);
 
-int main(int argc, char** argv)
+int main2(int argc, char** argv)
 {
 	printf("Start.\n");
 
@@ -53,6 +53,14 @@ int main(int argc, char** argv)
 
 	testWithTrainingData(decisionTree);
 
+	printf("Normalize Tree: \n");
+	Node* normalizedTree = NULL;
+
+	normalizeTree(decisionTree, normalizedTree);
+
+	printf("Test normalized Tree with Training Data: \n");
+	testWithTrainingData(normalizedTree);
+
 	int depth = treeDepth(decisionTree);
 	trace("Depth of Tree is: " + to_string(depth));
 	printf("Depth of Tree is: %d\n", depth);
@@ -61,10 +69,11 @@ int main(int argc, char** argv)
 	//printTree(decisionTree);
 
 	std::ofstream tree_file(treeFile());
-	saveTree(decisionTree, tree_file);
+	saveTree(normalizedTree, tree_file);
 	tree_file.close();
 
 	freeTree(decisionTree);
+	freeTree(normalizedTree);
 
 	printf("SUCCESSFULLY built DECISION TREE\n");
 	string c;
@@ -73,7 +82,7 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-int main2(int argc, char** argv) 
+int main(int argc, char** argv) 
 {
 	printf("Start.\n");
 	trace("Read training Data from folder " + datasetFile());

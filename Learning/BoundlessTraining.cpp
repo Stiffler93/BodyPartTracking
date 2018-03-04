@@ -8,6 +8,9 @@
 #include <sstream>
 #include <functional>
 #include <ctime>
+#include <map>
+
+#define REC_DONE ULLONG_MAX
 
 using std::string;
 using std::to_string;
@@ -17,7 +20,7 @@ void determineBufferSizes(FILE*& file, int* buffer_size, int* line_size);
 void iterate(FILE* file, std::vector<Metadata*>& metadata, char* buffer, int buffer_size, char* line_buffer, int line_size,
 	PlainRecord* recordTemplate, size_t* lookupTable, bool assign, int iteration, 
 	std::function<void(PlainRecord*, size_t*, std::vector<Metadata*>&, bool b)> func);
-bool processMetadata(std::vector<Metadata*>& metadatas);
+bool processMetadata(std::vector<Metadata*>& metadatas, size_t* lookupTable);
 bool postProcess(std::vector<Metadata*>& metadatas);
 
 void readMetaData(Metadata* metadata, size_t* lookupTable) {
@@ -93,7 +96,7 @@ void loadLookupTable(size_t* lookupTable, string datasetMap) {
 void checkRecord(PlainRecord* record, size_t* lookupTable, std::vector<Metadata*>& metadatas, bool checkSubset) {
 	//trace("checkRecord()");
 	RecordValuePair rVPair;
-	size_t rec;
+	size_t rec, look;
 	size_t subset = 0;
 	short value;
 	char category;
@@ -102,10 +105,16 @@ void checkRecord(PlainRecord* record, size_t* lookupTable, std::vector<Metadata*
 		//trace("Feature " + to_string(feat));
 		rVPair = record->feature[feat];
 		rec = atol(rVPair.record);
+
+		look = lookupTable[rec];
+		
+		if (look == REC_DONE)
+			continue;
+
 		value = atoi(rVPair.value);
-		category = get_category(lookupTable[rec]);
+		category = get_category(look);
 		if (checkSubset) {
-			subset = get_subset(lookupTable[rec]);
+			subset = get_subset(look);
 		}
 
 		if (isDoneOrNull(metadatas[subset])) {
@@ -148,6 +157,9 @@ void assignRecord(PlainRecord* recordTemplate, size_t* lookupTable, std::vector<
 		record = atol(recordTemplate->feature[feat].record);
 		look = lookupTable[record];
 
+		if (look == REC_DONE)
+			continue;
+
 		processed = get_flag(look);
 		if (processed != processFlag) {
 			//trace("processed != processFlag -> continue");
@@ -156,10 +168,12 @@ void assignRecord(PlainRecord* recordTemplate, size_t* lookupTable, std::vector<
 
 		subset = get_subset(look);
 
+		if (subset * 2 >= metadatas.size()) {
+			trace("subset is too big!!! - Metadatas(" + to_string(i) + "): - check feature " + to_string(feat) + ", subset = " + to_string(subset * 2));
+		}
+
 		if (isDoneOrNull(metadatas[subset*2]) || metadatas[subset*2]->bestSplit.decision.feature != feat)
 			continue;
-
-		//trace("Metadatas(" + to_string(i) + "): - check feature " + to_string(feat));
 
 		category = get_category(look);
 		value = atoi(recordTemplate->feature[feat].value);
@@ -275,7 +289,7 @@ void startBoundlessTraining(string datasetFile, string datasetMap, tree::Node** 
 		printf("Iteration 1 took %05.2lf seconds.\n", elapsed);
 
 		start = clock();
-		processing = processMetadata(metadatas);
+		processing = processMetadata(metadatas, lookupTable);
 		end = clock();
 		elapsed = ((double)end - (double)start) / (double)CLOCKS_PER_SEC;
 		printf("processMetadata took %05.2lf seconds.\n", elapsed);
@@ -284,6 +298,8 @@ void startBoundlessTraining(string datasetFile, string datasetMap, tree::Node** 
 			trace("processing = false -> break");
 			break;
 		}
+
+		//printLookupTable(lookupTable);
 
 		start = clock();
 		iterate(file, metadatas, buffer, buffer_size, line_buffer, line_size, recordTemplate, lookupTable, true, iteration, assignRecord);
@@ -382,15 +398,15 @@ void iterate(FILE* file, std::vector<Metadata*>& metadata, char* buffer, int buf
 	}
 }
 
-bool processMetadata(std::vector<Metadata*>& metadatas) {
+bool processMetadata(std::vector<Metadata*>& metadatas, size_t* lookupTable) {
 
 	trace("processMetadata()");
+	std::map<size_t, size_t> subsetChangeMap;
+	std::vector<size_t> subsetCrossOutList;
 
 	bool done = true;
 
-	int metad = -1;
 	for (Metadata*& m : metadatas) {
-		metad++;
 		if (isDoneOrNull(m)) {
 			//trace("Metadata(" + to_string(metad) + ") done -> continue");
 			continue;
@@ -410,7 +426,9 @@ bool processMetadata(std::vector<Metadata*>& metadatas) {
 
 		*m->nodeRef = (tree::Node*) new tree::DecisionNode(m->bestSplit.decision);
 		if (*m->nodeRef == NULL) {
+			printf("Assigning DecisionNode failed\n");
 			trace("Assigning DecisionNode failed!");
+			exit(31);
 		}
 
 		trace("DecisionNode: >" + (*m->nodeRef)->toString() + "<");
@@ -423,60 +441,78 @@ bool processMetadata(std::vector<Metadata*>& metadatas) {
 	}
 
 	size_t size = metadatas.size();
-	trace("Num Metadatas = " + to_string(size));
+	//trace("Num Metadatas = " + to_string(size));
 
+	std::vector<Metadata*>::iterator begin = metadatas.begin(), end = metadatas.end() - 1;
+	size_t index_begin = 0, index_end = 0;
+
+	while (begin != end) {
+		if (*begin != NULL) {
+			++begin;
+		}
+		else if (*end == NULL) {
+			//trace("Delete end");
+			index_end = end - metadatas.begin();
+			subsetCrossOutList.push_back(index_end);
+			metadatas.erase(end--);
+		}
+		else if (*end != NULL) {
+			index_begin = begin - metadatas.begin();
+			index_end = end - metadatas.begin();
+			subsetChangeMap.insert(std::pair<size_t, size_t>(index_end, index_begin));
+			subsetCrossOutList.push_back(index_begin);
+			//trace("SEt index(" + to_string(index_begin) + ") to value of index(" + to_string(index_end) + ") and remove end!");
+			metadatas[index_begin] = metadatas[index_end];
+			metadatas.erase(end--);
+		}
+	}
+
+	if (begin == end && *end == NULL) {
+		//trace("Delete end");
+		index_end = end - metadatas.begin();
+		subsetCrossOutList.push_back(index_end);
+		metadatas.erase(end);
+	}
+
+	size = metadatas.size();
+	trace("After Reduction size = " + to_string(size));
+
+	int null = 0, notNull = 0;
 	for (int i = 1; i < size; i++) {
 		if (metadatas[i * 2 - 2] == NULL) {
 			metadatas.insert(metadatas.begin() + (i * 2 - 1), NULL);
+			null += 2;
 		}
 		else {
 			metadatas.insert(metadatas.begin() + (i * 2 - 1), new Metadata());
 			metadatas[i * 2 - 1]->bestSplit = metadatas[(i - 1) * 2]->bestSplit;
+			notNull += 2;
 		}
-
-		//if (metadatas[(i - 1) * 2]->done) {
-		//	metadatas[i * 2 - 1]->done = true;
-		//}
 	}
 
 	if (metadatas[metadatas.size() - 1] == NULL) {
 		metadatas.insert(metadatas.end(), NULL);
+		null += 2;
 	}
 	else {
 		metadatas.insert(metadatas.end(), new Metadata());
 		size = metadatas.size();
 		metadatas[size - 1]->bestSplit = metadatas[size - 2]->bestSplit;
+		notNull += 2;
 	}
 
 	trace("Num Metadatas after Insertion = " + to_string(size));
+	printf("Metadata -> NULL = %d, NOT_NULL = %d\n", null, notNull);
 
 	if (size % 2 != 0) {
 		printf("Error while processing metadata. size is odd!\n");
 		exit(19);
 	}
 
-	//trace("All Metadatas:");
-	//for (Metadata* m : metadatas) {
-	//	trace(m->toString());
-	//}
-
-	//trace("Connect Nodes");
 	size = metadatas.size();
-	//trace("Metadatas.size() == " + to_string(size));
 	for (int i = 0; i < size; i += 2) {
 		if (isDoneOrNull(metadatas[i]))
 			continue;
-
-		//printf("true_branch pointer = %p\n", &(*metadatas[i]->nodeRef)->true_branch);
-		//printf("false_branch pointer = %p\n", &(*metadatas[i]->nodeRef)->false_branch);
-
-		//if (metadatas[i]->nodeRef == NULL) {
-		//	trace("metadatas[" + to_string(i) + "]->nodeRef == NULL");
-		//} 
-
-		//if (metadatas[i + 1]->nodeRef == NULL) {
-		//	trace("metadatas[" + to_string(i + 1) + "]->nodeRef == NULL");
-		//}
 
 		//trace("Connect Metadatas " + to_string(i) + " & " + to_string(i + 1) + " to false and true branch of Metadata " + to_string(i));
 		metadatas[i + 1]->nodeRef = &(*metadatas[i]->nodeRef)->false_branch;
@@ -491,9 +527,46 @@ bool processMetadata(std::vector<Metadata*>& metadatas) {
 			trace("Assigning True Branch failed!");
 			exit(73);
 		}
+	}
 
-		//printf("metadatas[%d+1]->nodeRef = %p\n", i, metadatas[i + 1]->nodeRef);
-		//printf("metadatas[%d]->nodeRef = %p\n", i, metadatas[i]->nodeRef);
+	if (!subsetCrossOutList.empty()) {
+		//trace("Modify LookupTable:");
+		//std::stringstream ss;
+		//ss << "Remove: " << subsetCrossOutList[0];
+		//for (int i = 1; i < subsetCrossOutList.size(); i++) {
+		//	ss << ", " << subsetCrossOutList[i];
+		//}
+		//trace(ss.str());
+		//ss.str("");
+
+		size_t look, subset, temp;
+		char value;
+		bool flag;
+		std::map<size_t, size_t>::iterator element;
+		for (size_t i = 0; i < tree::BPT_NUM_RECORDS; i++) {
+			look = lookupTable[i];
+			subset = get_subset(look);
+
+			if ((element = subsetChangeMap.find(subset)) != subsetChangeMap.end()) {
+				value = get_category(look);
+				flag = get_flag(look);
+				temp = combine(element->second, flag, value);
+				//ss << "Change lookupTable[" << to_string(i) << "] from >";
+				//ss << std::setw(16) << std::setfill('0') << std::hex << lookupTable[i] << "< to >";
+				//ss << std::setw(16) << std::setfill('0') << std::hex << temp << "<";
+				//trace(ss.str());
+				//ss.str("");
+				lookupTable[i] = temp;
+			}
+			else if (std::find(subsetCrossOutList.begin(), subsetCrossOutList.end(), subset) != subsetCrossOutList.end()) {
+				//ss << "Mark lookupTable[" << to_string(i) << "] DONE >";
+				//ss << std::setw(16) << std::setfill('0') << std::hex << lookupTable[i] << "< to >";
+				//ss << std::setw(16) << std::setfill('0') << std::hex << REC_DONE << "<";
+				//trace(ss.str());
+				//ss.str("");
+				lookupTable[i] = REC_DONE;
+			}
+		}
 	}
 
 	trace("processMetadata() done");

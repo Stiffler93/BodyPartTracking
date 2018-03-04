@@ -199,18 +199,36 @@ void bestSplit(Metadata *metadata) {
 	if (isDoneOrNull(metadata))
 		return;
 
-	//trace("Best Split:");
+	trace("Best Split:");
 
-	//int i = 0;
-	//for (FeatureStats s : metadata->stats) {
-	//	trace("FeatureStats(" + to_string(i++) + "): gain = " + to_string(s.getBestSplit().gain) + ", dec = " + to_string(s.getBestSplit().decision.feature)
-	//		+ "|" + to_string(s.getBestSplit().decision.refVal));
-	//}
+	int i = 0;
+	for (FeatureStats s : metadata->stats) {
+		trace("FeatureStats(" + to_string(i++) + "): gain = " + to_string(s.getBestSplit().gain) + ", dec = " + to_string(s.getBestSplit().decision.feature)
+			+ "|" + to_string(s.getBestSplit().decision.refVal));
+		/*if (s.getBestSplit().decision.feature == 25 && s.getBestSplit().decision.refVal == 2531 ||
+			s.getBestSplit().decision.feature == 20 && s.getBestSplit().decision.refVal == 348) {
+			printf("Feature %d, Refval %d: %lf\n", s.getBestSplit().decision.feature, s.getBestSplit().decision.refVal, s.getBestSplit().gain);
+		}*/
+	}
 
+	const int FACTOR = 1000000;
 	tree::BestSplit bestSplit;
+	int newGain, oldGain;
 
+	//if (/*gain > split.gain*/newGain > oldGain) {
+	//	split.gain = gain;
+	//	split.decision = dec;
+	//}
 	for (int f = 0; f < tree::BPT_NUM_FEATURES; f++) {
-		if (metadata->stats[f].getBestSplit().gain > bestSplit.gain) {
+		newGain = (int)(metadata->stats[f].getBestSplit().gain * FACTOR);
+		oldGain = (int)(bestSplit.gain * FACTOR);
+		if (f == 25 && metadata->stats[f].getBestSplit().decision.refVal == 2531) {
+			printf("Feature %d, Refval %d: %lf\n", f, metadata->stats[f].getBestSplit().decision.refVal, metadata->stats[f].getBestSplit().gain);
+			printf("BestSplit: Feature %d, Refval %d: %lf\n", bestSplit.decision.feature, bestSplit.decision.refVal, bestSplit.gain);
+		}
+		//if (metadata->stats[f].getBestSplit().gain >= bestSplit.gain) {
+		// for comparison with parallel!
+		if(newGain >= oldGain) {
 			bestSplit = metadata->stats[f].getBestSplit();
 		}
 	}
