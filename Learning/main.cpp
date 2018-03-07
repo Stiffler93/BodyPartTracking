@@ -51,7 +51,7 @@ int main2(int argc, char** argv)
 	string b;
 	std::cin >> b;
 
-	testWithTrainingData(decisionTree);
+	testWithTrainingDataWithoutRecord(decisionTree);
 
 	printf("Normalize Tree: \n");
 	Node* normalizedTree = NULL;
@@ -59,7 +59,7 @@ int main2(int argc, char** argv)
 	normalizeTree(decisionTree, normalizedTree);
 
 	printf("Test normalized Tree with Training Data: \n");
-	testWithTrainingData(normalizedTree);
+	testWithTrainingDataWithoutRecord(normalizedTree);
 
 	int depth = treeDepth(decisionTree);
 	trace("Depth of Tree is: " + to_string(depth));
@@ -125,8 +125,8 @@ int main(int argc, char** argv)
 	clock_t begin = clock();
 
 	Node* decisionTree = NULL;
-	startSimpleTraining(trData, numTrData, decisionTree);
-	//startParallelTraining(trData, numTrData, decisionTree);
+	//startSimpleTraining(trData, numTrData, decisionTree);
+	startParallelTraining(trData, numTrData, decisionTree);
 
 	clock_t end = clock();
 	double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
@@ -136,7 +136,13 @@ int main(int argc, char** argv)
 	string b; 
 	std::cin >> b;
 
-	testWithTrainingData(decisionTree);
+	if (tree::BPT_DATASET_WITH_RECORDS) {
+		testWithTrainingData(decisionTree);
+	}
+	else {
+		testWithTrainingDataWithoutRecord(decisionTree);
+
+	}
 	//testWithTestData(decisionTree, testData, numTestData);
 
 	trace("Write training results to " + treeFile());

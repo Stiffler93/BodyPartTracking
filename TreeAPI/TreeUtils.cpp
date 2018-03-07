@@ -109,6 +109,12 @@ bool getNextRecord(std::ifstream& dataset, tree::Record& record)
 
 	int value = 0;
 	int feat = 0;
+
+	if (tree::BPT_DATASET_WITH_RECORDS) {
+		size_t rec;
+		ss >> rec;
+	}
+
 	while (ss >> value) {
 		if (feat < tree::numFeatures()) {
 			record.feature[feat] = value;

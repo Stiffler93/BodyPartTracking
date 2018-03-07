@@ -16,6 +16,7 @@
 
 using namespace tree;
 using std::string;
+using std::to_string;
 
 static int infoGainFailures = 0;
 
@@ -71,7 +72,8 @@ cl::Kernel* kernel(cl::Context context, cl::Device device, string file, std::map
 
 void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, cl::Context& context, cl::Device& device, cl::CommandQueue& queue, unsigned long* numTrDataLeft, cl::Kernel* kernels, int cycle = 1) {
 	//std::printf("Call trainingsLoop(). numTrData = %d\n", numTrData);
-	std::printf("Tree Depth: %4d. numTrDataLeft: %10ld\r", cycle++, *numTrDataLeft);
+	std::printf("Tree Cycle: %4d. numTrDataLeft: %10ld\r", cycle++, *numTrDataLeft);
+	trace("Tree Cycle: " + to_string(cycle) + ", numTrDataLeft: " + to_string(*numTrDataLeft) + "current subset: " + to_string(numTrData));
 	
 	bool firstTime = true;
 
@@ -165,7 +167,7 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 			std::printf("Impurity >%lf< is wrong! Exit program!\n", imp);
 		}
 
-		if (true /*imp > BPT_STOP_EVALUATION_IMPURITY*/) {
+		if (imp > BPT_STOP_EVALUATION_IMPURITY) {
 			trace("Calc unique Vals");
 
 			cl::Buffer* unique_vals_buffer = new cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(unsigned char) * NUM_VALS_PER_FEATURE * numFeatures(), NULL, &err);
@@ -204,9 +206,6 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 			trace("unique Vals buffer read.");
 
 			delete unique_vals_buffer;
-
-			srand(time(0));
-			double randNum = 0;
 
 			int numUniqueVals = 0;
 			std::vector<short> values;
@@ -283,16 +282,16 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 					infoGainFailures++;
 					trace("Impurity = " + std::to_string(imp) + ", Index = " + std::to_string(i) + ", Split Info Gain = " + std::to_string(read_split_info_gain[i])+ " < 0 || > 1 !!!\n");
 
-					if (firstTime) {
-						firstTime = false;
-						trace("Dataset (wrong info gain!):");
-						for (unsigned int i = 0; i < numTrData; i++) {
-							trace(trData[i].toString());
-						}
-					}
+					//if (firstTime) {
+					//	firstTime = false;
+					//	trace("Dataset (wrong info gain!):");
+					//	for (unsigned int i = 0; i < numTrData; i++) {
+					//		trace(trData[i].toString());
+					//	}
+					//}
 				}
 
-				if (newGain > oldGain) {
+				if (newGain >= oldGain) {
 					split.gain = (float)read_split_info_gain[i];
 					split.decision.feature = splitInfo[i * 2];
 					split.decision.refVal = splitInfo[i * 2 + 1];
@@ -310,7 +309,7 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 		delete temp_values_buffer;
 	}
 
-	if (/*imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || */split.gain == 0) {
+	if (imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || split.gain == 0) {
 		trace("Create ResultNode");
 		if (numTrData == 1 || imp == 0) {
 			Result res;
@@ -357,7 +356,7 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 		return;
 	}
 
-	trace("Create DecisionNode");
+	trace("Create DecisionNode with decision: >" + to_string(split.decision.feature) + "," + to_string(split.decision.refVal) + "<");
 
 	node = (Node*) new DecisionNode(split.decision);
 
@@ -366,6 +365,9 @@ void trainingsLoop(Record * trData, const unsigned int numTrData, Node *& node, 
 	part.false_branch = new Record[numTrData];
 
 	partition(&part, trData, numTrData, split.decision);
+
+	trace("After Partition: ");
+	trace("true_branch_size = " + to_string(part.true_branch_size) + ", false_branch_size = " + to_string(part.false_branch_size));
 
 	delete[] trData;
 
@@ -448,7 +450,7 @@ void startParallelTraining(Record * trData, const unsigned int numTrData, Node *
 	std::printf("Kernels created... Start training!\n\n");
 
 	unsigned long numTrDataLeft = numTrData;
-	//std::printf("NumTrDataLeft: %ld\n", numTrDataLeft);
+	std::printf("NumTrDataLeft: %ld\n", numTrDataLeft);
 
 	clock_t b = clock();
 	trainingsLoop(trData, numTrData, rootNode, context, default_device, queue, &numTrDataLeft, kernels);

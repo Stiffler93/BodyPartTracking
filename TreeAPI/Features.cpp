@@ -47,6 +47,7 @@ void getSubject(Mat& depImg, Mat& depImgSubject) {
 	depImgSubject *= factor;
 
 	depImgSubject.setTo(0, mask == 0);
+	depImgSubject.setTo(NORM_FACTOR, depImgSubject > NORM_FACTOR);
 }
 
 void getHorizontalIntegral(cv::Mat& image, cv::Mat& horizIntegral)
@@ -119,29 +120,57 @@ void getIntegral(cv::Mat & image, cv::Mat & integral)
 	}
 }
 
-string getCategory(int red, int green, int blue) {
-	if (red <= 5 && green <= 5 && blue >= 85 && blue <= 95) {
-		return HEAD;
-	}
+std::string getCategory(int red, int green, int blue)
+{
+	if (!tree::BPT_PROCESS_REAL_DATA) {
+		if (red <= 5 && green <= 5 && blue >= 85 && blue <= 95) {
+			return HEAD;
+		}
 
-	if (red <= 5 && green >= 85 && green <= 95 && blue >= 85 && blue <= 95) {
-		return NECK;
-	}
+		if (red <= 5 && green >= 85 && green <= 95 && blue >= 85 && blue <= 95) {
+			return NECK;
+		}
 
-	if (red <= 5 && green >= 85 && green <= 95 && blue <= 5) {
-		return LEFT_SHOULDER;
-	}
+		if (red <= 5 && green >= 85 && green <= 95 && blue <= 5) {
+			return LEFT_SHOULDER;
+		}
 
-	if (red >= 85 && red <= 95 && green <= 5 && blue <= 5) {
-		return RIGHT_SHOULDER;
-	}
+		if (red >= 85 && red <= 95 && green <= 5 && blue <= 5) {
+			return RIGHT_SHOULDER;
+		}
 
-	if (red >= 85 && red <= 95 && green >= 85 && green <= 95 && blue <= 5) {
-		return NECK;
-	}
+		if (red >= 85 && red <= 95 && green >= 85 && green <= 95 && blue <= 5) {
+			return NECK;
+		}
 
-	if (red >= 85 && red <= 95 && green >= 85 && green <= 95 && blue >= 85 && blue <= 95) {
-		return OTHER;
+		if (red >= 85 && red <= 95 && green >= 85 && green <= 95 && blue >= 85 && blue <= 95) {
+			return OTHER;
+		}
+	}
+	else {
+		if (red <= 5 && green <= 5 && blue >= 250) {
+			return HEAD;
+		}
+
+		if (red <= 5 && green >= 250 && blue >= 250) {
+			return NECK;
+		}
+
+		if (red <= 5 && green >= 250 && blue <= 5) {
+			return LEFT_SHOULDER;
+		}
+
+		if (red >= 250 && green <= 5 && blue <= 5) {
+			return RIGHT_SHOULDER;
+		}
+
+		if (red >= 250 && green >= 250 && blue <= 5) {
+			return NECK;
+		}
+
+		if (red >= 250 && green >= 250 && blue >= 250) {
+			return OTHER;
+		}
 	}
 
 	return NONE;
@@ -150,45 +179,84 @@ string getCategory(int red, int green, int blue) {
 Vec3b getBGR(string category)
 {
 	Vec3b color;
-	if (category == HEAD) {
-		color[2] = 0;
-		color[1] = 0;
-		color[0] = 90;
-	}
-	else if (category == NECK) {
-		color[2] = 0;
-		color[1] = 90;
-		color[0] = 90;
-	}
-	else if (category == LEFT_SHOULDER) {
-		color[2] = 0;
-		color[1] = 90;
-		color[0] = 0;
-	}
-	else if (category == RIGHT_SHOULDER) {
-		color[2] = 90;
-		color[1] = 0;
-		color[0] = 0;
-	}
-	else if (category == STERNUM) {
-		color[2] = 90;
-		color[1] = 90;
-		color[0] = 0;
-	}
-	else if (category == OTHER) {
-		color[2] = 90;
-		color[1] = 90;
-		color[0] = 90;
+
+	if (!tree::BPT_PROCESS_REAL_DATA) {
+		if (category == HEAD) {
+			color[2] = 0;
+			color[1] = 0;
+			color[0] = 90;
+		}
+		else if (category == NECK) {
+			color[2] = 0;
+			color[1] = 90;
+			color[0] = 90;
+		}
+		else if (category == LEFT_SHOULDER) {
+			color[2] = 0;
+			color[1] = 90;
+			color[0] = 0;
+		}
+		else if (category == RIGHT_SHOULDER) {
+			color[2] = 90;
+			color[1] = 0;
+			color[0] = 0;
+		}
+		else if (category == STERNUM) {
+			color[2] = 90;
+			color[1] = 90;
+			color[0] = 0;
+		}
+		else if (category == OTHER) {
+			color[2] = 90;
+			color[1] = 90;
+			color[0] = 90;
+		}
+		else {
+			color[2] = 127;
+			color[1] = 127;
+			color[0] = 127;
+		}
 	}
 	else {
-		color[2] = 127;
-		color[1] = 127;
-		color[0] = 127;
+		if (category == HEAD) {
+			color[2] = 0;
+			color[1] = 0;
+			color[0] = 255;
+		}
+		else if (category == NECK) {
+			color[2] = 0;
+			color[1] = 255;
+			color[0] = 255;
+		}
+		else if (category == LEFT_SHOULDER) {
+			color[2] = 0;
+			color[1] = 255;
+			color[0] = 0;
+		}
+		else if (category == RIGHT_SHOULDER) {
+			color[2] = 255;
+			color[1] = 0;
+			color[0] = 0;
+		}
+		else if (category == STERNUM) {
+			color[2] = 255;
+			color[1] = 255;
+			color[0] = 0;
+		}
+		else if (category == OTHER) {
+			color[2] = 255;
+			color[1] = 255;
+			color[0] = 255;
+		}
+		else {
+			color[2] = 127;
+			color[1] = 127;
+			color[0] = 127;
+		}
 	}
 
 	return color;
 }
-
 
 void feature1(Mat& subject, Mat& feature1, Mat& depthImg, int offset) {
 	if (subject.type() != 2) {
@@ -696,6 +764,9 @@ void feature13(cv::Mat & subject, cv::Mat & feature13, int offset, cv::Mat & int
 		getVerticalIntegral(subject, integral);
 		getHorizontalIntegral(subject, integral);
 	}
+
+	if (offset > 42)
+		offset = 42; // maximum result of feature is supposed to be lower than 2000!
 
 	offset /= 2;
 

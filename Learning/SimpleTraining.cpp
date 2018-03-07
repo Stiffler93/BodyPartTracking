@@ -6,16 +6,22 @@
 
 using namespace tree;
 using std::string;
+using std::to_string;
 
 void buildTree(Node*& decNode, Record* trData, int numTrData, unsigned long* numTrDataLeft) {
 
 	float imp = impurity(trData, numTrData);
+	trace("Impurity = " + to_string(imp));
 
 	BestSplit split;
-	//if(imp > BPT_STOP_EVALUATION_IMPURITY)
+	if (imp > BPT_STOP_EVALUATION_IMPURITY) {
 		split = findBestSplit(trData, numTrData);
+		trace("Split found:");
+		trace("Gain = " + to_string(split.gain));
+		trace("Split = >" + to_string(split.decision.feature) + "," + to_string(split.decision.refVal) + "<");
+	}
 
-	if (/*imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || */split.gain == 0) {
+	if (imp <= BPT_STOP_EVALUATION_IMPURITY || numTrData <= BPT_STOP_EVALUATION_LIMIT || split.gain == 0) {
 		if (numTrData == 1 || isPure(trData, numTrData)) {
 			Result res;
 			res.outcome = trData[0].outcome;
@@ -53,6 +59,8 @@ void buildTree(Node*& decNode, Record* trData, int numTrData, unsigned long* num
 			decNode = (Node*) new ResultNode(endRes);
 		}
 
+		trace("Create ResultNode");
+
 		delete[] trData;
 
 		*numTrDataLeft = *numTrDataLeft - numTrData;
@@ -62,6 +70,7 @@ void buildTree(Node*& decNode, Record* trData, int numTrData, unsigned long* num
 	}
 
 	decNode = (Node*) new DecisionNode(split.decision);
+	trace("Create DecisionNode");
 
 	Partition part;
 	part.true_branch = new Record[numTrData];

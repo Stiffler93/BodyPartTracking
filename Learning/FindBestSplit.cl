@@ -77,7 +77,7 @@ __kernel void FindBestSplit(__global const unsigned short* dataset, __global dou
 				continue;
 			}
 
-			if(dataset[abs_index + feat] < value) {
+			if(dataset[abs_index + feat] <= value) {
 				partition[idx] = PARTITION_ONE | dataset[abs_index + CATEGORY];
 				flags[idx] = 1;
 			} else {

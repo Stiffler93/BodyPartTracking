@@ -4,6 +4,7 @@
 
 using namespace tree;
 using std::string;
+using std::to_string;
 
 bool isPure(tree::Record* trData, int numTrData) {
 	string ref = trData[0].outcome;
@@ -102,6 +103,7 @@ UniqueValues calcUniqueVals(Record* trData, int numTrData, int feature) {
 
 BestSplit findBestSplit(Record* trData, int numTrData) {
 	float current_uncertainty = impurity(trData, numTrData);
+	trace("Current uncertainty = " + to_string(current_uncertainty));
 	BestSplit split;
 
 	Partition part;
@@ -110,14 +112,14 @@ BestSplit findBestSplit(Record* trData, int numTrData) {
 
 	int uniqueVal = 0;
 
-	//trace("Unique Vals: ");
+	trace("Unique Vals: ");
 
 	for (int feat = 0; feat < numFeatures(); feat++) {
 		UniqueValues unVals = calcUniqueVals(trData, numTrData, feat);
 
-		//for (int i = 0; i < unVals.numVals; i++) {
-		//	trace("UniqueVal: >" + std::to_string(feat) + "," + std::to_string(unVals.vals[i]) + "<");
-		//}
+		for (int i = 0; i < unVals.numVals; i++) {
+			trace("UniqueVal: >" + std::to_string(feat) + "," + std::to_string(unVals.vals[i]) + "<");
+		}
 
 		for (std::vector<int>::iterator it = unVals.vals.begin(); it != unVals.vals.end(); ++it) {
 			uniqueVal++;
@@ -135,6 +137,7 @@ BestSplit findBestSplit(Record* trData, int numTrData) {
 			int oldGain = (int)(split.gain * FACTOR);
 
 			if (/*gain > split.gain*/newGain >= oldGain) {
+				trace("New BestSplit >" + to_string(dec.feature) + "," + to_string(dec.refVal) + "<, InfoGain = " + to_string(gain));
 				split.gain = gain;
 				split.decision = dec;
 			}

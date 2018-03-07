@@ -75,11 +75,9 @@ int main(int argc, char** argv)
 	std::ofstream features(tree::datasetFile());
 
 	srand(time(0));
-	double randNum;
+	//double randNum;
 
-	uint64 recordNum = 0;
-	tree::DatasetMetaData metaData;
-
+	size_t recordNum = 0;
 	size_t totalNumRecords = 0;
 
 	for (string image : trData) {
@@ -97,13 +95,14 @@ int main(int argc, char** argv)
 		int imgNumber = atoi(image.substr(0, image.find_first_of('.')).c_str());
 		getSubject(depImg, subject);
 		
-		//if (imgNumber < 49 || imgNumber > 146) {
-		//	subject = cv::Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
-		//	getSubject(depImg, subject);
-		//}
-		//else {
-		//	subject = depImg;
-		//}
+		if (!tree::BPT_PROCESS_REAL_DATA || (imgNumber < 49 || imgNumber > 146)) {
+			subject = cv::Mat(MAX_ROW, MAX_COL, DEPTH_IMAGE);
+			getSubject(depImg, subject);
+		}
+		else {
+			subject = depImg;
+			continue;
+		}
 
 		//int key = 0;
 		//while (key != 27) {
@@ -150,28 +149,30 @@ int main(int argc, char** argv)
 
 		for (int row = 0; row < MAX_ROW; row++) {
 			for (int col = 0; col < MAX_COL; col++) {
-				if (subject.at<ushort>(row, col) == 0)
+				if (subject.at<ushort>(row, col) == 0) {
 					continue;
+				}
 
 				colors = colImg.at<cv::Vec3b>(row, col);
 				set.outcome = getCategory(colors[2], colors[1], colors[0]);
 
-				if (set.outcome == NONE)
-					continue;
-
-				// reduce pixels by half
-				randNum = (double)rand() / (double)RAND_MAX;
-				if (randNum >= 0.5) {
+				if (set.outcome == NONE) {
 					continue;
 				}
 
-				// OTHER pixels are relatively the most pixels, so reduce them further
-				if (set.outcome == OTHER) {
-					randNum = (double)rand() / (double)RAND_MAX;
-					if (randNum >= 0.80) {
-						continue;
-					}
-				}
+				//// reduce pixels by half
+				//randNum = (double)rand() / (double)RAND_MAX;
+				//if (randNum >= 0.5) {
+				//	continue;
+				//}
+
+				//// OTHER pixels are relatively the most pixels, so reduce them further
+				//if (set.outcome == OTHER) {
+				//	randNum = (double)rand() / (double)RAND_MAX;
+				//	if (randNum >= 0.80) {
+				//		continue;
+				//	}
+				//}
 
 				set.feature[0] = feat1.at<ushort>(row, col);
 				set.feature[1] = feat2.at<ushort>(row, col);
@@ -202,10 +203,8 @@ int main(int argc, char** argv)
 
 				features.width(12);
 				features.fill('0');
-				features << ++recordNum << " " << set.toString() << std::endl;
+				features << recordNum++ << " " << set.toString() << std::endl;
 				numDatasets++;
-
-				metaData.meta[categoryToValue(set.outcome)].numRecords++;
 			}
 		}
 
@@ -213,9 +212,6 @@ int main(int argc, char** argv)
 		printf("Algorithm classified %zd pixels for Image %s.\n", numDatasets, image.c_str());
 		printf("\nFinished image %s.\n", image.c_str());
 	}
-
-	metaData.meta[NUM_META_DATA - 1].numRecords = totalNumRecords;
-	features << metaData.toString();
 
 	features.close();
 
